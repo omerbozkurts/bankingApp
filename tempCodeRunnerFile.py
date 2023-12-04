@@ -1,1 +1,0 @@
-self.startLabel.pack()

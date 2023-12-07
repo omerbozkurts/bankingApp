@@ -1,6 +1,7 @@
-import time
 import random
 import os
+import hashlib
+import datetime
 
 class Kullanici:
     def __init__(self):
@@ -10,6 +11,7 @@ class Kullanici:
         self.soyad='no info'
         self.dogumTarihi="0"
         self.sifre=0
+        self.role='customer'
         
 
     def kayitOl(self,tcNo,ad,soyad,dogumTarihi,sifre):
@@ -18,15 +20,20 @@ class Kullanici:
             self.tcNo=tcNo
             self.ad=ad
             self.soyad=soyad
-            self.dogumTarihi=dogumTarihi
-            if self.checkSifre(sifre):
-                self.sifre=sifre
-                self.dokumanaKaydet()
-                print("kayit basarili")
+            if self.yasKontrol(dogumTarihi):
+                self.dogumTarihi=dogumTarihi
+                if self.checkSifre(sifre):
+                    self.sifre=sifre
+                    self.dokumanaKaydet()
+                else:
+                     print("hatali sifre girildi kayit olusturulamadi")
+                     return self.kayitOl()
             else:
-                return "hatali sifre girildi kayit olusturulamadi"
+                print("yas 18'den kucuk olamaz")
+                return self.kayitOl()
         else:
-            return "hatali tc girildi kayit olusturulamadi"
+            print("hatali tc girildi kayit olusturulamadi")
+            return self.kayitOl()
             
 
     def checkTc(self,tcNo):
@@ -50,54 +57,97 @@ class Kullanici:
             return False
         
     def dokumanaKaydet(self):
-        kayitTarihi=time.ctime()
-        musteriN=self.musteriNoAta()
-        with open('kullanici.txt',"a+",encoding='utf-8') as file:
-            self.ad=self.ad.replace(' ','*')
-            file.write(f'{musteriN} {self.tcNo} {self.ad} {self.soyad} {self.dogumTarihi} {self.sifre} {kayitTarihi}\n')
+        if not os.path.isfile("kullanici.txt") or self.search(self.tcNo,'musteriTc')== False:
+            kayitTarihi=datetime.date.today()
+            musteriN=self.musteriNoAta()
+            with open('kullanici.txt',"a+",encoding='utf-8') as file:
+                self.ad=self.ad.replace(' ','*')
+                file.write(f'{musteriN} {self.tcNo} {self.ad} {self.soyad} {self.dogumTarihi} {self.sifre} {self.role} {kayitTarihi}\n')
+                print("kayit basarili")
+        else:
+            print(f"{self.tcNo} tc numarali {self.ad} {self.soyad} zaten kayitlidir")        
     
     def musteriNoAta(self):
         chckNo=int(random.random()*(10**9))
         src=self.search(chckNo,'musteriNo')
-        if src:
+        if not os.path.isfile("kullanici.txt"):
+            return chckNo
+        elif src is False:
             return chckNo
         else:
             return self.musteriNoAta()
     
     def search(self,searchInfo,searchType):
+        flag=0
         if not os.path.isfile("kullanici.txt"):
-            return 'bu isimde bir dosya olmadigi icin kontrol saglanamadi'
+            print('bu isimde bir dosya olmadigi icin kontrol saglanamadi')
+            return False
         with open("kullanici.txt",'r',encoding='utf-8') as file:
             for kullanici in file:
                 musteri=kullanici.split()
-                musteriN=musteri[0]
-                musteriTc=musteri[1]
+                musteriN=int(musteri[0])
+                musteriTc=int(musteri[1])
                 musteriAd=musteri[2].split('*')
-                musteriSoyad=musteri[4]
-                musteriDogum=musteri[5]
-                musteriSifre=musteri[6]
-                musteriKayit=musteri[7] + ' ' + musteri[8] + ' ' + musteri[9] + ' ' + musteri[10] + ' ' + musteri[11]
+                musteriSoyad=musteri[3]
+                musteriDogum=musteri[4]
+                musteriSifre=int(musteri[5])
+                musteriRol=musteri[6]
+                musteriKayit=musteri[7]
                 if searchType=='musteriNo' and searchInfo==musteriN:
+                    flag=1
                     return True
                 elif searchType=='musteriTc' and searchInfo==musteriTc:
+                    flag=1
                     return True
                 elif searchType=='musteriAd' and searchInfo==musteriAd:
+                    flag=1
                     return True
                 elif searchType=='musteriSoyad' and searchInfo==musteriSoyad:
+                    flag=1
                     return True
                 elif searchType=='musteriDogum' and searchInfo==musteriDogum:
+                    flag=1
                     return True
                 elif searchType=='musteriSifre' and searchInfo==musteriSifre:
+                    flag=1
                     return True
                 elif searchType=='musteriKayit' and searchInfo==musteriKayit:
+                    flag=1
                     return True
+            if flag==0:
+                return False
+    def girisYap(self,girisTc,girisSifre):
+        print(girisTc)
+        print(girisSifre)
+        if self.search(girisTc,"musteriTc") and self.search(girisSifre,'musteriSifre'):
+            print('giris basarili')
+            return True
+        else:
+            print('giris yapilamadi')
+            return False
+        
+    def hashing(txt):
+        sha256_hash = hashlib.sha256()
+        sha256_hash.update(txt.encode('utf-8'))
+        return sha256_hash.hexdigest()
+    
+    def yasKontrol(self,dogumTarih):
+        dogumTarih=dogumTarih.split("/")
+        dogumGun=int(dogumTarih[0])
+        dogumAy=int(dogumTarih[1])        
+        dogumYil=int(dogumTarih[2])
+        bugunTarih=str(datetime.date.today())
+        bugunTarih=bugunTarih.split('-')
+        bugunGun=int(bugunTarih[2])
+        bugunAy=int(bugunTarih[1])
+        bugunYil=int(bugunTarih[0])
+        dgm=dogumGun+dogumAy*30+dogumYil*365
+        bgn=bugunGun+bugunAy*30+bugunYil*365
+        if bgn-dgm<18*365:
+            return False
+        else:
+            return True
 
-kisi1= Kullanici()
-tc=15284679002
-kisiAd="omer can"
-kisiSoyad="bozkurt"
-kisiDogum="15/08/2002"
-kisiSifre=106018
-print(kisi1.kayitOl(tc,kisiAd,kisiSoyad,kisiDogum,kisiSifre))
+
             
     

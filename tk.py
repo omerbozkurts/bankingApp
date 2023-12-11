@@ -37,14 +37,15 @@ def bankaIsimGoster():
 
 def girisEkrani():
 
- 
     def girisYap():
-        if musteri.girisYap(int(kullaniciAdi.get()),int(parola.get())):
+        x=int(kullaniciAdi.get())
+        y=int(parola.get())
+        if musteri.girisYap(x,y):
             frame.destroy()
-            label.destroy() 
+            label.destroy()
             girisLbl=ctk.CTkLabel(app,text='Giris Basarili',font=('text',16))
             girisLbl.pack(pady=150)
-            girisLbl.after(1000,anasayfa)
+            girisLbl.after(1000,lambda:anasayfa(x))
             girisLbl.after(1000,lambda:girisLbl.destroy())    
         else:
             girisHataLbl=ctk.CTkLabel(frame,text='Hatali Kullanici Adi Veya Sifre')
@@ -123,8 +124,11 @@ def girisEkrani():
     kayitOlB = ctk.CTkButton(frame,text='Kayıt Ol',command=kayit)
     kayitOlB.pack(pady=12,padx=10)
 
-
-def anasayfa():
+    
+def anasayfa(kTc):
+    musteri.musteriGetir(kTc)
+    print(musteri.musteriAd)
+    print(musteri.musteriNo)
     anasayfa=ctk.CTkLabel(app,text='anasayfa')
     anasayfa.pack(pady=12,padx=10)
 

@@ -3,8 +3,8 @@ class HashTable:
         self.size = 0
         self.table = [None] * self.size
 
-    def uzunlukBul(self):
-        with open("kullanici.txt",'r') as file:
+    def uzunlukBul(self,dosyaKonum):
+        with open(dosyaKonum,'r') as file:
             for x in file.readlines():
                 self.size+=1
         self.table= [None] * self.size
@@ -33,12 +33,12 @@ class HashTable:
                     return item[1]
         raise KeyError(f"Key not found: {key}")
 
-    def musteriCek(self):
-        self.uzunlukBul()
-        with open("kullanici.txt", 'r', encoding='utf-8') as file:
-            for kullanici in file:
-                musteriNo = int(kullanici.split()[0])
-                self.add(musteriNo,kullanici)
-
-def musteriBilgiGetir():
-    HashTable.musteriCek()
+    
+def dosyadanCek(dosyaKonum,getKey):
+        table=HashTable()
+        table.uzunlukBul(dosyaKonum)
+        with open(dosyaKonum,'r',encoding='utf-8') as file:
+            for data in file:
+                key=int(data.split()[0])
+                table.add(key,data)
+        return table.get(getKey)

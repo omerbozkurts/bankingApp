@@ -1,1 +1,0 @@
-0 0 ['14.hareket', '13.hareket', '12.hareket', '11.hareket', '10.hareket', '9.hareket', '8.hareket', '7.hareket', '6.hareket', '5.hareket']

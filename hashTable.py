@@ -35,10 +35,32 @@ class HashTable:
 
     
 def dosyadanCek(dosyaKonum,getKey):
-        table=HashTable()
-        table.uzunlukBul(dosyaKonum)
-        with open(dosyaKonum,'r',encoding='utf-8') as file:
-            for data in file:
-                key=int(data.split()[0])
+    table=HashTable()
+    table.uzunlukBul(dosyaKonum)
+    with open(dosyaKonum,'r',encoding='utf-8') as file:
+        for data in file:
+            key=int(data.split()[0])
+            table.add(key,data)
+    return table.get(getKey)
+
+def tabloOlustur(dosyaKonum):
+    table=HashTable()
+    table.uzunlukBul(dosyaKonum)
+    with open(dosyaKonum,'r',encoding='utf-8') as file:
+        for data in file:
+            key=int(data.split()[0])
+            table.add(key,data)
+        return table.table
+
+def ekleDuzenle(dosyaKonum,newData):
+    table=HashTable()
+    table.uzunlukBul(dosyaKonum)
+    with open(dosyaKonum,'r',encoding='utf-8') as file:
+        for data in file.readlines():
+            key=int(data.split()[0])
+            newKey=newData.split()[0]
+            if key!=newKey:
                 table.add(key,data)
-        return table.get(getKey)
+            else:
+                table.add(newKey,newData)
+        return table.table

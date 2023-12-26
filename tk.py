@@ -1,5 +1,4 @@
 import customtkinter as ctk 
-import tkinter.messagebox as tkmb
 import tkinter as tk
 from musteri import Musteri
 
@@ -133,10 +132,10 @@ def anasayfa(kTc):
     anaHesapTur=anaHesap.split()[-3].replace("*"," ")
     anaHesapAd=anaHesap.split()[-4].replace('*',' ')
     anaHesapBakiye=anaHesap.split()[1]
-    anasayfa=ctk.CTkLabel(app,text=f'Iyi gunler, {musteri.musteriAd} {musteri.musteriSoyad}',font=('text',16))
-    anasayfa.pack(pady=5,padx=5)
+    anasayfaLbl=ctk.CTkLabel(app,text=f'Iyi gunler, {musteri.musteriAd} {musteri.musteriSoyad}',font=('text',16))
+    anasayfaLbl.pack(pady=5,padx=5)
 
-    tabview = ctk.CTkTabview(app,fg_color='transparent',width=360)
+    tabview = ctk.CTkTabview(app,fg_color='transparent',width=360,height=700)
     tabview.place(x=20,y=50)
     tabview.add("Anasayfa") 
     tabview.add("Hesaplar")
@@ -168,6 +167,121 @@ def anasayfa(kTc):
     mNoLbl.place(x=10,y=150)
     mNameLbl=ctk.CTkLabel(master=kartBilgi,text=f'{musteri.musteriAd} {musteri.musteriSoyad}')
     mNameLbl.place(x=10,y=170)
+
+    def hesapHareketleriYazdir(hesap):
+
+        musteri.hareketleriGetir(hesap)
+        hareketSayisi=len(musteri.hesapHareketleri)
+        tabview.destroy()
+        anasayfaLbl.destroy()
+        baslik=ctk.CTkLabel(app,text='Hesap Hareketleri',font=('text',16))
+        baslik.pack(pady=5,padx=5)
+
+        kaydirmaFrame=ctk.CTkFrame(app,bg_color='transparent',fg_color='transparent')
+        kaydirmaFrame.pack(pady=0,padx=0,fill='both',expand=True)
+
+        kaydirHareketlerFrame=ctk.CTkScrollableFrame(kaydirmaFrame,orientation="vertical",fg_color='transparent' ,bg_color='transparent',height=650)
+        kaydirHareketlerFrame.pack(pady=0,padx=0,fill='both',expand=True)
+
+        hesapBilgi=ctk.CTkFrame(kaydirHareketlerFrame)
+        hesapBilgi.pack(pady=5,padx=5,fill='both')
+        hesapTurLbl=ctk.CTkLabel(hesapBilgi,text=f'{hesap.split()[-3].replace("*"," ")}',font=('text',18))
+        hesapTurLbl.place(y=5,x=10)
+        hesapAdLbl=ctk.CTkLabel(hesapBilgi,text=f'{hesap.split()[-4].replace('*',' ')}',font=('text',14))
+        hesapAdLbl.place(y=50,x=10)
+        hesapBakiyeLbl=ctk.CTkLabel(hesapBilgi,text=f'Bakiye: ',font=('text',18))
+        hesapBakiyeLbl.place(x=200,y=100)
+        hesapBakiyeMiktarLbl=ctk.CTkLabel(hesapBilgi,text=f'{hesap.split()[1]}',font=('text',18))
+        hesapBakiyeMiktarLbl.place(x=280,y=100)
+        tlYazisiLbl=ctk.CTkLabel(hesapBilgi,text='.00 TL',font=('text',18))
+        tlYazisiLbl.place(x=320,y=100)
+
+        sonOnHareket=ctk.CTkLabel(kaydirHareketlerFrame,text='Son 10 Hareket',font=('text',16))
+        sonOnHareket.pack(pady=10,padx=10)
+
+        for i in range(hareketSayisi):
+            if str(musteri.hesapHareketleri[i])!='0':
+                hareketFrame=ctk.CTkFrame(kaydirHareketlerFrame)
+                hareketFrame.pack(padx=10,pady=10,fill='both')
+                hareketLbl=ctk.CTkLabel(hareketFrame,text=f'{musteri.hesapHareketleri[i]}',font=('text',18))
+                hareketLbl.pack(padx=10,pady=10)
+
+        def hareketSayfaKapat():
+            baslik.destroy()
+            kaydirmaFrame.destroy()
+            kaydirmaFrame.after(200,lambda:anasayfa(kTc))
+
+        anasayfaB = ctk.CTkButton(kaydirHareketlerFrame,text='Ana Sayfa',command=hareketSayfaKapat)
+        anasayfaB.pack(pady=12,padx=10)
+
+       
+        
+
+    hesapHareketleriB = ctk.CTkButton(tabview.tab("Anasayfa"),text='Hesap Hareketleri',command=lambda:hesapHareketleriYazdir(anaHesap))
+    hesapHareketleriB.pack(pady=12,padx=10)
+    
+    
+
+    length=len(musteri.hesaplar)
+
+    kaydirFrame=ctk.CTkScrollableFrame(tabview.tab('Hesaplar'),orientation="vertical",fg_color='transparent' ,bg_color='transparent',height=650)
+    kaydirFrame.pack(pady=0,padx=0,fill='both',expand=True)
+
+
+    for i in range(length):
+        hesap=musteri.hesaplar[i]
+        hesapTur=hesap.split()[-3].replace("*"," ")
+        hesapAd=hesap.split()[-4].replace('*',' ')
+        hesapBakiye=hesap.split()[1]
+        hesaplarBilgi=ctk.CTkFrame(kaydirFrame)
+        hesaplarBilgi.pack(pady=5,padx=5,fill='both')
+        hesapTurLbl=ctk.CTkLabel(hesaplarBilgi,text=f'{hesapTur}',font=('text',18))
+        hesapTurLbl.place(y=5,x=10)
+        hesapAdLbl=ctk.CTkLabel(hesaplarBilgi,text=f'{hesapAd}',font=('text',14))
+        hesapAdLbl.place(y=50,x=10)
+        hesapBakiyeLbl=ctk.CTkLabel(hesaplarBilgi,text=f'Bakiye: ',font=('text',18))
+        hesapBakiyeLbl.place(x=120,y=110)
+        hesapBakiyeMiktarLbl=ctk.CTkLabel(hesaplarBilgi,text=f'{hesapBakiye}',font=('text',18))
+        hesapBakiyeMiktarLbl.place(x=200,y=110)
+        tlYazisiLbl=ctk.CTkLabel(hesaplarBilgi,text='.00 TL',font=('text',18))
+        tlYazisiLbl.place(x=240,y=110)
+        hesapHareketleriB = ctk.CTkButton(hesaplarBilgi,text='Hesap Hareketleri',command=lambda i=i: hesapHareketleriYazdir(musteri.hesaplar[i]))
+        hesapHareketleriB.place(x=170,y=150)
+
+    paraGonderFrame=ctk.CTkFrame(tabview.tab('Para Gonder'))
+    paraGonderFrame.pack(padx=0,pady=10,fill='both', expand=True)
+
+    tabview = ctk.CTkTabview(paraGonderFrame,fg_color='transparent',width=360)
+    tabview.place(x=0,y=0)
+    tabview.add("Tc No") 
+    tabview.add("Musteri No")
+
+    aliciTcLbl=ctk.CTkEntry(tabview.tab('Tc No'),placeholder_text="Alici Tc No")
+    aliciTcLbl.pack(pady=12,padx=10)
+
+    miktarLbl= ctk.CTkEntry(tabview.tab('Tc No'),placeholder_text="miktar") 
+    miktarLbl.pack(pady=12,padx=10)
+
+    aliciMusteriNoLbl= ctk.CTkEntry(tabview.tab('Musteri No'),placeholder_text="Alici Musteri No") 
+    aliciMusteriNoLbl.pack(pady=12,padx=10)
+
+    musteriNoMiktarLbl= ctk.CTkEntry(tabview.tab('Musteri No'),placeholder_text="miktar") 
+    musteriNoMiktarLbl.pack(pady=12,padx=10)
+
+    tcParaGonderButton=ctk.CTkButton(tabview.tab('Tc No'),text='Para Gonder',command=lambda:paraGonder('tcNo'))
+    tcParaGonderButton.pack(padx=10,pady=10)
+
+    hNoParaGonderButton=ctk.CTkButton(tabview.tab('Musteri No'),text='Para Gonder',command=lambda:paraGonder('hesapNo'))
+    hNoParaGonderButton.pack(padx=10,pady=10)
+
+    def paraGonder(yontem):
+        if yontem=='tcNo':
+            musteri.paraGonder(musteri.musteriTc,int(aliciTcLbl.get()),0,1,int(miktarLbl.get()),yontem)
+        elif yontem=='hesapNo':
+            musteri.paraGonder(musteri.musteriTc,0,int(aliciMusteriNoLbl.get()),1,int(musteriNoMiktarLbl.get()),yontem)
+        anasayfaLbl.destroy()
+        anasayfa(kTc)
+
 
 karsilama()
 

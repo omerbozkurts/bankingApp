@@ -51,6 +51,7 @@ class Musteri(Kullanici):
     def hesaplariGetir(self):
         konum='musteriHesaplar/' + str(self.musteriNo) + ".txt"
         with open(konum,'r',encoding='utf-8') as file:
+            self.hesaplar=[]
             for line in file.readlines():
                 self.hesaplar.append(line)
 
@@ -94,20 +95,22 @@ class Musteri(Kullanici):
             self.hesapAdi=str(hesapAd.replace(' ','*'))
         self.musteriHesapAc()
 
-    def paraGonder(self,gonderenTc,aliciTc,aliciHesapNo,gonderenHesap,miktar,yontem):
-            self.musteriGetir(gonderenTc)
+    def paraGonder(self,gonderenTc,aliciTc,aliciMusteriNo,gonderenHesap,miktar,yontem):
+            #self.musteriGetir(gonderenTc)
             gonderenDosya='musteriHesaplar/' + str(self.musteriNo) + ".txt"
-            gonderenHesap=dosyadanCek(gonderenDosya,gonderenHesap)
+            gonderenHesap=dosyadanCek(gonderenDosya,1)
             if yontem=='kendi':
                 alanDosya=gonderenDosya
                 aliciHesap=gonderenHesap
                 self.paraAktar(gonderenDosya,alanDosya,miktar,gonderenHesap,aliciHesap)
             elif yontem=='hesapNo':
-                alanDosya='musteriHesaplar/' + str(self.musteriNo) + ".txt"
+                alanDosya='musteriHesaplar/' + str(aliciMusteriNo) + ".txt"
                 aliciHesap=dosyadanCek(alanDosya,1)
+                self.paraAktar(gonderenDosya,alanDosya,miktar,gonderenHesap,aliciHesap)
             elif yontem=='tcNo':
-                self.musteriGetir(aliciTc)
-                alanDosya='musteriHesaplar/' + str(self.musteriNo) + ".txt"
+                alici= Musteri()
+                alici.musteriGetir(aliciTc)
+                alanDosya='musteriHesaplar/' + str(alici.musteriNo) + ".txt"
                 aliciHesap=dosyadanCek(alanDosya,1)
                 self.paraAktar(gonderenDosya,alanDosya,miktar,gonderenHesap,aliciHesap)
 
@@ -123,7 +126,7 @@ class Musteri(Kullanici):
                         bakiye=int(gonderenHesap.split()[1])
                         bakiye-=miktar
                         self.sonHareketler(f'{miktar} Tl gonderildi',gonderenHesap)
-                        sonKisim=' '.join(gonderenHesap.split()[-6:])
+                        sonKisim=' '.join(gonderenHesap.split()[-4:])
                         gonderenHesap=gonderenHesap[0]+ ' ' + str(bakiye) + ' ' + str(self.hesapHareketleri) + ' ' + sonKisim + "\n"
                         tempFile.write(str(gonderenHesap))
         os.remove(gonderenDosya)
@@ -138,7 +141,7 @@ class Musteri(Kullanici):
                         bakiye=int(alanHesap.split()[1])
                         bakiye+=miktar
                         self.sonHareketler(f'{miktar} Tl geldi',alanHesap)
-                        sonKisim=' '.join(alanHesap.split()[-6:])                   
+                        sonKisim=' '.join(alanHesap.split()[-4:])                   
                         alanHesap=alanHesap[0]+ ' ' + str(bakiye) + ' ' + str(self.hesapHareketleri) + ' ' + sonKisim + "\n"
                         tempFile.write(str(alanHesap))
         os.remove(alanDosya)
@@ -153,16 +156,25 @@ class Musteri(Kullanici):
             if hareketler[i]!=0:
                 hesapHareketiSayisi+=1
         if hesapHareketiSayisi<9:
-            self.hesapHareketleri[hesapHareketiSayisi]=hareket
+            for i in range(hesapHareketiSayisi):
+                self.hesapHareketleri[hesapHareketiSayisi-i]=self.hesapHareketleri[hesapHareketiSayisi-i-1]
+            self.hesapHareketleri[0]=hareket
             
         else:
             for i in range(10):
                 self.hesapHareketleri[9-i]=self.hesapHareketleri[9-i-1]
             self.hesapHareketleri[0]=hareket
 
+    def hareketleriGetir(self,hesap):
+        hesapNo=int(hesap.split()[0])
+        hesap=self.hesaplar[hesapNo-1]
+        hareketler=re.search(r'\[.*\]',hesap)
+        hareketler=ast.literal_eval(hareketler.group())
+        self.hesapHareketleri=hareketler
 
 # musteri=Musteri()
-# musteri.musteriGetir(15284679013)
+# musteri.musteriGetir()
+# musteri.vadesizHesapAc('yatirim')
 # print(musteri.musteriAd)
 # musteri.vadesizHesapAc('hesabim')
 # musteri.vadesizHesapAc('')

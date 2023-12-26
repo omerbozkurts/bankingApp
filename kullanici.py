@@ -147,14 +147,6 @@ class Kullanici:
             return True
 
 # kullanici=Kullanici()
-# kullanici.kayitOl(15284679024,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679114,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679215,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679316,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679417,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679518,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679619,'omer can','bozkurt','12/05/2002',106018)
-# kullanici.kayitOl(15284679608,'omer can','bozkurt','12/05/2002',106018)
 # print(kullanici.tcNo)
 # print(kullanici.sifre)
 # print(kullanici.role)

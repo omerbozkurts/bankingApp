@@ -28,7 +28,7 @@ def dosyayaKaydet(root):
         with open("kullanici2.txt",'+a',encoding='utf-8') as file:
             file.write(f'{root.musteriNo} {kullanici[0]} {kullanici[1]} {kullanici[2]} {kullanici[3]} {kullanici[4]} {kullanici[5]} {kullanici[6]}\n')
         dosyayaKaydet(root.right)
-        
+       
 with open("kullanici.txt", 'r', encoding='utf-8') as file:
     for kullanici in file:
         kullanici = kullanici.split()

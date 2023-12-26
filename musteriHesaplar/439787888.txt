@@ -1,4 +1,0 @@
-1 4580 ['230 Tl geldi', '230 Tl geldi', '120 Tl geldi', '100 Tl geldi', '100 Tl gonderildi', '100 Tl gonderildi', '100 Tl gonderildi', '100 Tl gonderildi', '100 Tl gonderildi', '100 Tl gonderildi'] Tl gonderildi'] hesabim Vadesiz*Tl*Hesabi 0 1500
-2 0 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] Vadesiz*Tl*Hesabi Vadesiz*Tl*Hesabi 0 1500
-3 0 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] vadeli1 Vadeli Tl Hesabi 0 1500
-4 0 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] kredi1 Kredi Hesabi 0 1500

@@ -1,0 +1,1 @@
+1 6440 ['316 Tl geldi', '498 Tl geldi', '129 Tl geldi', '927 Tl geldi', '95 Tl geldi', '120 Tl geldi', '112 Tl geldi', 0, 0, 0] Vadesiz*Tl*Hesabi Vadesiz*Tl*Hesabi 0 1500

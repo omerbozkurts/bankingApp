@@ -1,0 +1,23 @@
+# Local development database. Production uses a managed PostgreSQL.
+name: abbank
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: abbank
+      POSTGRES_PASSWORD: abbank_dev
+      POSTGRES_DB: abbank
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/<major>/docker.
+      - pgdata:/var/lib/postgresql
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U abbank -d abbank"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

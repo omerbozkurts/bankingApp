@@ -10,14 +10,14 @@ Masaüstü (customtkinter) sürümünden mobil ve web'e taşınıyor.
 | Klasör | İçerik |
 |---|---|
 | [`app/`](app/) | Yeni uygulama — Expo / React Native (iOS, Android, Web) |
-| `backend/` | *(sıradaki adım)* FastAPI + PostgreSQL API |
+| [`backend/`](backend/) | API — FastAPI + PostgreSQL |
 | [`logo/`](logo/) | Marka kimliği: logo, ikonlar, sunum ve [marka kılavuzu](logo/brand/MARKA.md) |
 | [`legacy/`](legacy/) | Eski masaüstü uygulaması (Python, customtkinter) — arşiv |
 
 ## Teknoloji
 
 - **Uygulama:** Expo SDK 58, React Native, TypeScript, Expo Router, react-native-svg, Manrope
-- **Sunucu (planlanan):** FastAPI, PostgreSQL, Argon2 şifre özeti, JWT oturum, Decimal para tutarları
+- **Sunucu:** Python 3.14, FastAPI, PostgreSQL 18, SQLAlchemy (async), Alembic, Argon2 şifre özeti, JWT oturum, kuruş cinsinden tam sayı para tutarları
 
 ## Eski masaüstü uygulaması
 

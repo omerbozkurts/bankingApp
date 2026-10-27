@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "AB Bank",
+    "slug": "ab-bank",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "abbank",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0E2A47",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0E2A47",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "monochromeImage": "./assets/images/monochrome-icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "name": "AB Bank",
+      "shortName": "AB Bank",
+      "themeColor": "#0E2A47",
+      "backgroundColor": "#0E2A47"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E2A47",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 140,
+          "dark": {
+            "backgroundColor": "#0E2A47",
+            "image": "./assets/images/splash-icon.png"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { restoreSession } from '@/lib/session';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,6 +45,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
+
+  // Pick up an existing session (stored token on native, cookie on web) once on start.
+  useEffect(() => {
+    restoreSession();
+  }, []);
 
   if (!ready) return null;
 

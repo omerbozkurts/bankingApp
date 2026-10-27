@@ -4,11 +4,26 @@ iOS, Android ve Web için tek kod tabanı: **Expo SDK 58 · React Native · Type
 
 ## Çalıştırma
 
+Önce API'yi başlatın (bkz. [`../backend/README.md`](../backend/README.md)), sonra:
+
 ```bash
 cd app
 npm install
 npx expo start        # QR kodu Expo Go ile okutun (telefon) veya w ile web'de açın
 npm run web           # doğrudan web
+```
+
+### Telefonda deneme
+
+Telefon `localhost` ile bilgisayara ulaşamaz. `app/.env.local` dosyasına bilgisayarın yerel ağ IP'sini yazın
+ve API'yi ağa açık başlatın:
+
+```bash
+# app/.env.local
+EXPO_PUBLIC_API_URL=http://192.168.1.20:8000
+
+# backend/ içinde
+uv run fastapi dev app/main.py --host 0.0.0.0
 ```
 
 ## Kontroller
@@ -24,11 +39,14 @@ npx expo export --platform web   # statik web çıktısı → dist/
 
 | Yol | İçerik |
 |---|---|
-| `src/app/` | Ekranlar (Expo Router): `index` karşılama, `giris` giriş |
+| `src/app/` | Ekranlar (Expo Router): `index` karşılama, `giris` giriş, `hesabim` hesaplar |
 | `src/components/brand/` | `Logo` bileşeni (sembol / yatay / dikey); yazı izleri `logo/brand` ana dosyasından |
 | `src/components/ui/` | `Button`, `TextField` |
 | `src/constants/theme.ts` | Marka renkleri, Manrope font adları, boşluk ve yarıçap ölçüleri |
-| `src/lib/` | Platformdan bağımsız mantık (doğrulama) |
+| `src/lib/api.ts` | API istemcisi (zaman aşımı, Türkçe hata mesajları) |
+| `src/lib/session.ts` | Oturum durumu: açılışta geri yükleme, giriş, yenileme, çıkış |
+| `src/lib/token-store*.ts` | Mobil: token `expo-secure-store`'da · Web: httpOnly çerez (JS'te token yok) |
+| `src/lib/` (diğer) | Doğrulama, para biçimi, API → uygulama veri eşlemesi |
 | `assets/images/` | Uygulama ikonu, Android uyarlanabilir/tek renk ikon, açılış görseli, favicon |
 
 Marka kuralları: [`../logo/brand/MARKA.md`](../logo/brand/MARKA.md)

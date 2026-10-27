@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 30
     cors_origins: list[str] = ["http://localhost:8081"]
 
+    # Web clients keep the session in an httpOnly cookie instead of JS-readable storage.
+    session_cookie_name: str = "abbank_session"
+    # Browsers accept Secure cookies on http://localhost, so this can stay on in development.
+    session_cookie_secure: bool = True
+
     # Lock an account for a while after repeated wrong passwords.
     max_failed_logins: int = 5
     lockout_minutes: int = 15

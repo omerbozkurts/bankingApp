@@ -18,9 +18,12 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { checkDemoCredentials, DEMO_CREDENTIALS } from '@/lib/demo-account';
+import { ApiError } from '@/lib/api';
 import { signIn } from '@/lib/session';
 import { digitsOnly, validateLogin, type LoginErrors } from '@/lib/validation';
+
+// Created by backend/scripts/seed_demo.py. Only shown in development builds.
+const DEV_DEMO = { customerNo: '123456789', password: '123456' } as const;
 
 export default function LoginScreen() {
   const theme = useTheme();
@@ -28,32 +31,40 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit() {
+  function showFormError(message: string) {
+    setFormError(message);
+    // accessibilityLiveRegion only covers Android; announce explicitly so VoiceOver hears it too.
+    AccessibilityInfo.announceForAccessibility(message);
+  }
+
+  async function submit() {
+    if (submitting) return;
     const next = validateLogin(customerNo, password);
     setErrors(next);
     setFormError(null);
-    // accessibilityLiveRegion only covers Android; announce explicitly so VoiceOver hears it too.
     const firstError = next.customerNo ?? next.password;
     if (firstError) {
       AccessibilityInfo.announceForAccessibility(firstError);
       return;
     }
-    // Until the FastAPI backend exists, only the demo account can sign in.
-    const customer = checkDemoCredentials(customerNo, password);
-    if (!customer) {
-      const message = 'Müşteri numarası veya şifre hatalı.';
-      setFormError(message);
-      AccessibilityInfo.announceForAccessibility(message);
-      return;
+
+    setSubmitting(true);
+    try {
+      await signIn(customerNo.trim(), password);
+      router.replace('/hesabim');
+    } catch (error) {
+      showFormError(error instanceof ApiError ? error.message : 'Beklenmeyen bir hata oluştu.');
+      setPassword('');
+    } finally {
+      setSubmitting(false);
     }
-    signIn(customer);
-    router.replace('/hesabim');
   }
 
   function fillDemo() {
-    setCustomerNo(DEMO_CREDENTIALS.customerNo);
-    setPassword(DEMO_CREDENTIALS.password);
+    setCustomerNo(DEV_DEMO.customerNo);
+    setPassword(DEV_DEMO.password);
     setErrors({});
     setFormError(null);
   }
@@ -118,23 +129,25 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            <Button title="Giriş yap" onPress={submit} />
+            <Button title="Giriş yap" onPress={submit} loading={submitting} />
 
-            <View
-              style={[styles.notice, { backgroundColor: theme.backgroundElement, borderLeftColor: theme.accent }]}>
-              <ThemedText type="smallBold">Demo hesap</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Müşteri no: {DEMO_CREDENTIALS.customerNo} · Şifre: {DEMO_CREDENTIALS.password}
-              </ThemedText>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Demo hesap bilgilerini doldur"
-                hitSlop={8}
-                onPress={fillDemo}
-                style={styles.fillDemo}>
-                <ThemedText type="link">Bilgileri doldur</ThemedText>
-              </Pressable>
-            </View>
+            {__DEV__ ? (
+              <View
+                style={[styles.notice, { backgroundColor: theme.backgroundElement, borderLeftColor: theme.accent }]}>
+                <ThemedText type="smallBold">Demo hesap (geliştirme)</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Müşteri no: {DEV_DEMO.customerNo} · Şifre: {DEV_DEMO.password}
+                </ThemedText>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Demo hesap bilgilerini doldur"
+                  hitSlop={8}
+                  onPress={fillDemo}
+                  style={styles.fillDemo}>
+                  <ThemedText type="link">Bilgileri doldur</ThemedText>
+                </Pressable>
+              </View>
+            ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

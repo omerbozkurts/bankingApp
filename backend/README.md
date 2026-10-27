@@ -20,16 +20,21 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 
 | Yöntem | Yol | Açıklama |
 |---|---|---|
-| `POST` | `/auth/login` | `{customer_no, password}` → `{access_token, token_type, expires_in}` |
-| `GET` | `/me` | Giriş yapmış müşteri (Bearer token) |
+| `POST` | `/auth/login` | `{customer_no, password}` → `{access_token, token_type, expires_in}` + web oturum çerezi |
+| `POST` | `/auth/logout` | Web oturum çerezini siler |
+| `GET` | `/me` | Giriş yapmış müşteri (Bearer token veya web çerezi) |
 | `GET` | `/accounts` | Müşterinin hesapları; tutarlar **kuruş** cinsinden tam sayı |
 | `GET` | `/health` | Uygulama ve veritabanı durumu |
 
 ## Güvenlik
 
 - Şifreler **Argon2id** ile özetlenir; düz metin hiçbir yerde tutulmaz.
-- Hatalı şifre ve olmayan müşteri **aynı yanıtı ve aynı süreyi** alır (müşteri numarası tahmini zorlaşır).
-- Aynı müşteriye **5 hatalı denemeden sonra 15 dakika kilit** (`429`). Ayarlar `app/config.py`'de.
+- Hatalı şifre, olmayan müşteri ve kilitli hesap **aynı yanıtı (401) ve aynı süreyi** alır; müşteri numarasının
+  var olup olmadığı anlaşılmaz.
+- Aynı müşteriye **5 hatalı denemeden sonra 15 dakika kilit**; ayrıca IP başına **5 dakikada 20 giriş denemesi**
+  (`429`). Ayarlar `app/config.py`'de.
+- **Mobil** istemci token'ı `Authorization: Bearer` ile gönderir. **Web** istemci httpOnly + Secure +
+  SameSite=Strict çerez kullanır; çerezli isteklerde `X-Requested-With` başlığı zorunludur (CSRF koruması).
 - Erişim token'ı 30 dakika geçerli; imza anahtarı `.env`'deki `JWT_SECRET` (en az 32 karakter, varsayılanı yok).
 - Para tutarları `BigInteger` kuruş; negatif bakiye veritabanı kısıtıyla engellenir.
 

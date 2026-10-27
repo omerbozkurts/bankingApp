@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -8,8 +10,9 @@ class LoginRequest(BaseModel):
 
 
 class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+    # Omitted for web (cookie) logins so page JavaScript never sees the session JWT.
+    access_token: str | None = None
+    token_type: Literal["bearer", "cookie"] = "bearer"
     expires_in: int
 
 

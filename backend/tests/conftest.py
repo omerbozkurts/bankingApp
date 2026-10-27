@@ -79,7 +79,11 @@ def create_customer() -> CreateCustomer:
     return _create
 
 
-async def login(client: httpx.AsyncClient, customer_no: str, password: str) -> httpx.Response:
+async def login(
+    client: httpx.AsyncClient, customer_no: str, password: str, *, web: bool = False
+) -> httpx.Response:
+    """Mobile-style login by default; web=True asks for the httpOnly session cookie instead."""
+    headers = {"X-Session-Mode": "cookie", "X-Requested-With": "abbank"} if web else {}
     return await client.post(
-        "/auth/login", json={"customer_no": customer_no, "password": password}
+        "/auth/login", json={"customer_no": customer_no, "password": password}, headers=headers
     )

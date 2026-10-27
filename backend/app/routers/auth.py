@@ -1,11 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.deps import SessionDep
+from app.deps import SESSION_MODE_HEADER, SessionDep, require_csrf_header
 from app.models import Customer
 from app.rate_limit import SlidingWindowLimiter
 from app.schemas import LoginRequest, Token
@@ -28,12 +28,15 @@ login_limiter = SlidingWindowLimiter(
 
 @router.post(
     "/login",
+    response_model_exclude_none=True,
     responses={
         401: {"description": "Giriş başarısız (hatalı bilgi veya geçici kilit)"},
         429: {"description": "Bu IP adresinden çok fazla deneme"},
     },
 )
-async def login(body: LoginRequest, request: Request, session: SessionDep) -> Token:
+async def login(
+    body: LoginRequest, request: Request, response: Response, session: SessionDep
+) -> Token:
     settings = get_settings()
     client_ip = request.client.host if request.client else "unknown"
     if not login_limiter.allow(client_ip):
@@ -73,4 +76,37 @@ async def login(body: LoginRequest, request: Request, session: SessionDep) -> To
     await session.commit()
 
     token, expires_in = create_access_token(customer.id)
-    return Token(access_token=token, expires_in=expires_in)
+    if request.headers.get(SESSION_MODE_HEADER) != "cookie":
+        # Mobile: token in the body only, kept in the device's secure storage.
+        return Token(access_token=token, token_type="bearer", expires_in=expires_in)
+
+    # Web: token in an httpOnly cookie only, never in the body that page JavaScript can read.
+    response.set_cookie(
+        settings.session_cookie_name,
+        token,
+        max_age=expires_in,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="strict",
+        path="/",
+    )
+    return Token(token_type="cookie", expires_in=expires_in)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    # Without the header another site could not send this anyway (SameSite=Strict), but require it
+    # so a cross-site form post can't force a sign-out either.
+    dependencies=[Depends(require_csrf_header)],
+)
+async def logout(response: Response) -> None:
+    """Clears the web session cookie. Mobile clients simply delete their stored token."""
+    settings = get_settings()
+    response.delete_cookie(
+        settings.session_cookie_name,
+        path="/",
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="strict",
+    )

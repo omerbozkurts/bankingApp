@@ -53,6 +53,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="giris" />
+        <Stack.Screen name="hesabim" />
       </Stack>
     </ThemeProvider>
   );

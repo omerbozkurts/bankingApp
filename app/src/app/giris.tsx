@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { checkDemoCredentials, DEMO_CREDENTIALS } from '@/lib/demo-account';
+import { signIn } from '@/lib/session';
 import { digitsOnly, validateLogin, type LoginErrors } from '@/lib/validation';
 
 export default function LoginScreen() {
@@ -25,22 +27,35 @@ export default function LoginScreen() {
   const [customerNo, setCustomerNo] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
-  const [notice, setNotice] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   function submit() {
     const next = validateLogin(customerNo, password);
     setErrors(next);
-    setNotice(null);
+    setFormError(null);
     // accessibilityLiveRegion only covers Android; announce explicitly so VoiceOver hears it too.
     const firstError = next.customerNo ?? next.password;
     if (firstError) {
       AccessibilityInfo.announceForAccessibility(firstError);
       return;
     }
-    // The FastAPI backend is the next task; until then the form only validates.
-    const message = 'Bilgileriniz geçerli. Sunucu bağlantısı bir sonraki adımda eklenecek.';
-    setNotice(message);
-    AccessibilityInfo.announceForAccessibility(message);
+    // Until the FastAPI backend exists, only the demo account can sign in.
+    const customer = checkDemoCredentials(customerNo, password);
+    if (!customer) {
+      const message = 'Müşteri numarası veya şifre hatalı.';
+      setFormError(message);
+      AccessibilityInfo.announceForAccessibility(message);
+      return;
+    }
+    signIn(customer);
+    router.replace('/hesabim');
+  }
+
+  function fillDemo() {
+    setCustomerNo(DEMO_CREDENTIALS.customerNo);
+    setPassword(DEMO_CREDENTIALS.password);
+    setErrors({});
+    setFormError(null);
   }
 
   return (
@@ -95,15 +110,31 @@ export default function LoginScreen() {
               />
             </View>
 
-            {notice ? (
+            {formError ? (
               <View
-                style={[styles.notice, { backgroundColor: theme.backgroundElement, borderLeftColor: theme.accent }]}
+                style={[styles.notice, { backgroundColor: theme.backgroundElement, borderLeftColor: theme.danger }]}
                 accessibilityLiveRegion="polite">
-                <ThemedText type="small">{notice}</ThemedText>
+                <ThemedText type="small">{formError}</ThemedText>
               </View>
             ) : null}
 
             <Button title="Giriş yap" onPress={submit} />
+
+            <View
+              style={[styles.notice, { backgroundColor: theme.backgroundElement, borderLeftColor: theme.accent }]}>
+              <ThemedText type="smallBold">Demo hesap</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Müşteri no: {DEMO_CREDENTIALS.customerNo} · Şifre: {DEMO_CREDENTIALS.password}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Demo hesap bilgilerini doldur"
+                hitSlop={8}
+                onPress={fillDemo}
+                style={styles.fillDemo}>
+                <ThemedText type="link">Bilgileri doldur</ThemedText>
+              </Pressable>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -145,5 +176,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     borderLeftWidth: 4,
     padding: Spacing.three,
+    gap: Spacing.one,
+  },
+  fillDemo: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.one,
   },
 });

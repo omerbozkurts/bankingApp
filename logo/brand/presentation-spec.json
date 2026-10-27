@@ -1,0 +1,35 @@
+{
+  "brand": "AB Bank",
+  "tagline": "Katman katman yükselin.",
+  "brief": "AB Bank, birikimini adım adım büyütmek isteyen bireyler için sade ve güven veren bir bankacılık uygulaması. Marka hikayesi yükseliş: her birikim bir katman, katmanlar üst üste geldikçe zirveye çıkılır.",
+  "adjectives": ["güvenilir", "sade", "yükselen", "sıcak"],
+  "criteria": "Başarı: mavi fintech kalabalığından ve tanınmış markaların renklerinden ayrışmak, 16 px'te tanınmak, tek renkte çalışmak, yükseliş hikayesini tek bakışta anlatmak.",
+  "industry": "finance",
+  "nav": ["Hesaplar", "Birikim", "Güvenlik"],
+  "brand_color": "#0E2A47",
+  "greyscale": false,
+  "designer": "AB Bank marka ekibi",
+  "round": 2,
+  "concepts": [
+    {
+      "name": "Katmanlar",
+      "symbol": "ab-bank-symbol.svg",
+      "lockup": "ab-bank-horizontal.svg",
+      "symbol_on_tile": "icons/ab-bank-app-icon.svg",
+      "lockup_on_dark": "ab-bank-horizontal-dark.svg",
+      "tile_color": "#0E2A47",
+      "idea": "Üst üste biriken katmanlar bir A silueti kurar; zirvedeki mercan katman, doğan güneş gibi yükselişin kendisidir.",
+      "rationale": [
+        "Birikim = katman, yükseliş = zirve: hikaye tek bakışta okunur",
+        "Kalkan, sütun, yukarı ok gibi banka klişelerinden uzak",
+        "Tek ölçü (44 birim katman, 16 birim boşluk) ile kurulu; desen ve ikon sistemine genişler"
+      ]
+    }
+  ],
+  "recommendation": "Katmanlar — sade, küçük boyda sağlam ve yükseliş hikayesini rengiyle taşıyor.",
+  "next_steps": [
+    "Logoyu uygulamanın giriş ekranına ve pencere ikonuna yerleştirmek",
+    "Arayüz renklerini marka paletine geçirmek",
+    "Profesyonel marka tescil araştırması"
+  ]
+}

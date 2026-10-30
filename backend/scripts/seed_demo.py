@@ -1,58 +1,101 @@
-"""Create the demo customer (123456789 / 123456). Safe to run more than once.
+"""Create the demo customers. Safe to run more than once.
 
     uv run python -m scripts.seed_demo
+
+- 123456789 / 123456  Deniz Yılmaz: checking + savings account
+- 987654321 / 654321  Ali Kaya: checking account, a recipient for trying transfers
 """
 
 import asyncio
 
 from sqlalchemy import select
 
+from app.banking import format_iban, make_tr_iban
 from app.db import SessionLocal, engine
 from app.models import Account, Customer, Transaction
 from app.security import hash_password
 
-DEMO_CUSTOMER_NO = "123456789"
-DEMO_PASSWORD = "123456"
+DEMO_CUSTOMERS = [
+    {
+        "customer_no": "123456789",
+        "password": "123456",
+        "full_name": "Deniz Yılmaz",
+        "accounts": [
+            {
+                "kind": "checking",
+                "name": "Vadesiz TL Hesabı",
+                "number": "0000000000000001",
+                # (description, amount) oldest first; the balance is their running total.
+                "movements": [("Maaş", 2_500_000), ("Kira", -1_254_925)],
+            },
+            {
+                "kind": "savings",
+                "name": "Birikim Hesabı",
+                "number": "0000000000000002",
+                "goal_kurus": 5_000_000,
+                "movements": [("Birikim", 3_820_000)],
+            },
+        ],
+    },
+    {
+        "customer_no": "987654321",
+        "password": "654321",
+        "full_name": "Ali Kaya",
+        "accounts": [
+            {
+                "kind": "checking",
+                "name": "Vadesiz TL Hesabı",
+                "number": "0000000000000003",
+                "movements": [("Maaş", 1_800_000)],
+            },
+        ],
+    },
+]
 
 
 async def seed() -> None:
     async with SessionLocal() as session:
-        exists = await session.scalar(
-            select(Customer.id).where(Customer.customer_no == DEMO_CUSTOMER_NO)
-        )
-        if exists:
-            print("Demo müşteri zaten var, değişiklik yapılmadı.")
-            return
+        for spec in DEMO_CUSTOMERS:
+            exists = await session.scalar(
+                select(Customer.id).where(Customer.customer_no == spec["customer_no"])
+            )
+            if exists:
+                print(f"{spec['customer_no']} zaten var, atlandı.")
+                continue
 
-        customer = Customer(
-            customer_no=DEMO_CUSTOMER_NO,
-            full_name="Deniz Yılmaz",
-            password_hash=hash_password(DEMO_PASSWORD),
-        )
-        checking = Account(
-            name="Vadesiz TL Hesabı",
-            iban="TR00 0000 0000 0000 0000 0000 01",
-            balance_kurus=1_245_075,
-        )
-        savings = Account(
-            name="Birikim Hesabı",
-            iban="TR00 0000 0000 0000 0000 0000 02",
-            balance_kurus=3_820_000,
-            goal_kurus=5_000_000,
-        )
-        customer.accounts = [checking, savings]
-        session.add(customer)
-        await session.flush()
-
-        session.add_all(
-            [
-                Transaction(account_id=checking.id, amount_kurus=2_500_000, description="Maaş"),
-                Transaction(account_id=checking.id, amount_kurus=-1_254_925, description="Kira"),
-                Transaction(account_id=savings.id, amount_kurus=3_820_000, description="Birikim"),
-            ]
-        )
+            customer = Customer(
+                customer_no=spec["customer_no"],
+                full_name=spec["full_name"],
+                password_hash=hash_password(spec["password"]),
+            )
+            session.add(customer)
+            for a in spec["accounts"]:
+                balance = 0
+                movements = []
+                for description, amount in a["movements"]:
+                    balance += amount
+                    movements.append(
+                        Transaction(
+                            amount_kurus=amount,
+                            balance_after_kurus=balance,
+                            description=description,
+                        )
+                    )
+                account = Account(
+                    kind=a["kind"],
+                    name=a["name"],
+                    iban=make_tr_iban(a["number"]),
+                    balance_kurus=balance,
+                    goal_kurus=a.get("goal_kurus"),
+                )
+                customer.accounts.append(account)
+                await session.flush()
+                for movement in movements:
+                    movement.account_id = account.id
+                session.add_all(movements)
+                print(f"  {spec['full_name']}: {a['name']} {format_iban(account.iban)}")
+            print(f"{spec['customer_no']} / {spec['password']} oluşturuldu.")
         await session.commit()
-        print(f"Demo müşteri oluşturuldu: {DEMO_CUSTOMER_NO} / {DEMO_PASSWORD}")
 
     await engine.dispose()
 

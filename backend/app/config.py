@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     database_url: str
     # No default on purpose: the app must not start with a guessable signing key.
     jwt_secret: str = Field(min_length=32)
+    # Key for hashing T.C. identity numbers. Changing it orphans existing digests: keep it stable.
+    national_id_pepper: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30
     cors_origins: list[str] = ["http://localhost:8081"]
@@ -26,6 +28,15 @@ class Settings(BaseSettings):
     # Per-IP cap on login attempts, independent of which customer number is tried.
     login_rate_limit: int = 20
     login_rate_window_seconds: int = 300
+    register_rate_limit: int = 5
+    register_rate_window_seconds: int = 3600
+    # Recipient lookups per customer, so IBANs can't be scanned to harvest masked names.
+    lookup_rate_limit: int = 30
+    lookup_rate_window_seconds: int = 300
+
+    # Transfer limits in kuruş: 50.000 TL per transfer, 100.000 TL per customer per rolling 24 h.
+    transfer_max_kurus: int = 5_000_000
+    transfer_daily_max_kurus: int = 10_000_000
 
 
 @lru_cache

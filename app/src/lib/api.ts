@@ -1,5 +1,20 @@
 import { API_URL } from './config';
-import { toCustomer, type ApiAccount, type ApiCustomer, type Customer } from './models';
+import {
+  toAccount,
+  toCustomer,
+  toMovement,
+  toTransferResult,
+  type Account,
+  type AccountKind,
+  type ApiAccount,
+  type ApiCustomer,
+  type ApiTransaction,
+  type ApiTransfer,
+  type Customer,
+  type MovementPage,
+  type Recipient,
+  type TransferResult,
+} from './models';
 import { clearToken, getToken, setToken, usesBearerToken } from './token-store';
 
 const TIMEOUT_MS = 15_000;
@@ -91,4 +106,74 @@ export async function fetchCustomer(): Promise<Customer> {
     request<ApiAccount[]>('/accounts'),
   ]);
   return toCustomer(me, accounts);
+}
+
+export async function register(input: {
+  nationalId: string;
+  fullName: string;
+  birthDate: string; // ISO YYYY-MM-DD
+  password: string;
+}): Promise<{ customerNo: string; fullName: string }> {
+  const out = await request<{ customer_no: string; full_name: string }>('/auth/register', {
+    method: 'POST',
+    body: {
+      national_id: input.nationalId,
+      full_name: input.fullName,
+      birth_date: input.birthDate,
+      password: input.password,
+    },
+  });
+  return { customerNo: out.customer_no, fullName: out.full_name };
+}
+
+export async function openAccount(input: {
+  kind: AccountKind;
+  name: string;
+  goalKurus: number | null;
+}): Promise<Account> {
+  const account = await request<ApiAccount>('/accounts', {
+    method: 'POST',
+    body: { kind: input.kind, name: input.name, goal_kurus: input.goalKurus },
+  });
+  return toAccount(account);
+}
+
+export async function fetchMovements(
+  accountId: number,
+  beforeId: number | null = null,
+  limit = 20,
+): Promise<MovementPage> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (beforeId !== null) params.set('before_id', String(beforeId));
+  const page = await request<{ items: ApiTransaction[]; next_before_id: number | null }>(
+    `/accounts/${accountId}/transactions?${params}`,
+  );
+  return { items: page.items.map(toMovement), nextBeforeId: page.next_before_id };
+}
+
+export async function lookupRecipient(iban: string): Promise<Recipient> {
+  const out = await request<{ iban: string; masked_name: string }>(
+    `/recipients/lookup?${new URLSearchParams({ iban })}`,
+  );
+  return { iban: out.iban, maskedName: out.masked_name };
+}
+
+export async function createTransfer(input: {
+  fromAccountId: number;
+  toIban: string;
+  amountKurus: number;
+  description: string;
+  idempotencyKey: string;
+}): Promise<TransferResult> {
+  const out = await request<ApiTransfer>('/transfers', {
+    method: 'POST',
+    body: {
+      from_account_id: input.fromAccountId,
+      to_iban: input.toIban,
+      amount_kurus: input.amountKurus,
+      description: input.description,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+  return toTransferResult(out);
 }

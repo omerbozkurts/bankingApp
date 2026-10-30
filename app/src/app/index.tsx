@@ -30,6 +30,7 @@ export default function WelcomeScreen() {
 
         <View style={styles.actions}>
           <Button title="Giriş yap" onPress={() => router.push('/giris')} />
+          <Button title="Hesap aç" variant="secondary" onPress={() => router.push('/kayit')} />
         </View>
       </SafeAreaView>
     </ThemedView>

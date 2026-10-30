@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   AccessibilityInfo,
@@ -27,7 +27,9 @@ const DEV_DEMO = { customerNo: '123456789', password: '123456' } as const;
 
 export default function LoginScreen() {
   const theme = useTheme();
-  const [customerNo, setCustomerNo] = useState('');
+  // Pre-filled after registration (kayit.tsx passes the new customer number).
+  const { musteriNo } = useLocalSearchParams<{ musteriNo?: string }>();
+  const [customerNo, setCustomerNo] = useState(() => digitsOnly(musteriNo ?? '', 9));
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [formError, setFormError] = useState<string | null>(null);

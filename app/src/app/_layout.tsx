@@ -59,7 +59,11 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="giris" />
+        <Stack.Screen name="kayit" />
         <Stack.Screen name="hesabim" />
+        <Stack.Screen name="hesap/[id]" />
+        <Stack.Screen name="gonder" />
+        <Stack.Screen name="hesap-ac" />
       </Stack>
     </ThemeProvider>
   );

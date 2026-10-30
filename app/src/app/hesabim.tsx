@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import {
   AccessibilityInfo,
@@ -16,8 +16,10 @@ import { LayerProgress } from '@/components/layer-progress';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
+import { formatIban } from '@/lib/banking';
 import { totalBalance, type Account } from '@/lib/models';
 import { formatKurus, goalProgress } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
@@ -82,6 +84,20 @@ export default function AccountScreen() {
             </ThemedText>
           </View>
 
+          <View style={styles.actions}>
+            <Button
+              title="Para gönder"
+              style={styles.action}
+              onPress={() => router.push('/gonder')}
+            />
+            <Button
+              title="Yeni hesap"
+              variant="secondary"
+              style={styles.action}
+              onPress={() => router.push('/hesap-ac')}
+            />
+          </View>
+
           {refreshError ? (
             <View
               style={[styles.notice, { backgroundColor: theme.backgroundElement, borderLeftColor: theme.danger }]}
@@ -110,13 +126,21 @@ function AccountCard({ account }: { account: Account }) {
   const progress = goal !== null ? goalProgress(account.balanceKurus, goal) : null;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${account.name}, ${formatKurus(account.balanceKurus)}. Hareketleri gör`}
+      onPress={() => router.push({ pathname: '/hesap/[id]', params: { id: String(account.id) } })}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: theme.backgroundElement },
+        pressed && styles.pressed,
+      ]}>
       <ThemedText type="label" themeColor="textSecondary">
         {account.name}
       </ThemedText>
       <ThemedText type="subtitle">{formatKurus(account.balanceKurus)}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        {account.iban}
+        {formatIban(account.iban)}
       </ThemedText>
 
       {goal !== null && progress !== null ? (
@@ -130,7 +154,7 @@ function AccountCard({ account }: { account: Account }) {
           </ThemedText>
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -164,8 +188,18 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     padding: Spacing.three,
   },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  action: {
+    flex: 1,
+  },
   list: {
     gap: Spacing.three,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   card: {
     borderRadius: Radius.card,

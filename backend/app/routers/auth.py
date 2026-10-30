@@ -1,15 +1,18 @@
+import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
+from app.banking import national_id_digest, random_iban
 from app.config import get_settings
 from app.deps import SESSION_MODE_HEADER, SessionDep, require_csrf_header
-from app.models import Customer
+from app.models import Account, Customer
 from app.rate_limit import SlidingWindowLimiter
-from app.schemas import LoginRequest, Token
-from app.security import create_access_token, verify_password
+from app.schemas import LoginRequest, RegisterOut, RegisterRequest, Token
+from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -24,6 +27,62 @@ _settings = get_settings()
 login_limiter = SlidingWindowLimiter(
     _settings.login_rate_limit, _settings.login_rate_window_seconds
 )
+register_limiter = SlidingWindowLimiter(
+    _settings.register_rate_limit, _settings.register_rate_window_seconds
+)
+
+TOO_MANY_REQUESTS = "Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin."
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        409: {"description": "Bu kimlik numarasıyla zaten kayıt var"},
+        429: {"description": "Bu IP adresinden çok fazla kayıt denemesi"},
+    },
+)
+async def register(body: RegisterRequest, request: Request, session: SessionDep) -> RegisterOut:
+    """Creates a customer with a checking account. Returns the new 9-digit customer number."""
+    if not register_limiter.allow(_client_ip(request)):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=TOO_MANY_REQUESTS)
+
+    digest = national_id_digest(body.national_id, get_settings().national_id_pepper)
+    if await session.scalar(select(Customer.id).where(Customer.national_id_digest == digest)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu bilgilerle yeni kayıt oluşturulamadı. Zaten müşterimizseniz giriş yapın.",
+        )
+
+    password_hash = await run_in_threadpool(hash_password, body.password)
+    # Random customer numbers and IBANs collide with negligible probability; retry just in case.
+    for _ in range(5):
+        customer = Customer(
+            customer_no=str(secrets.randbelow(900_000_000) + 100_000_000),
+            full_name=body.full_name,
+            password_hash=password_hash,
+            national_id_digest=digest,
+            birth_date=body.birth_date,
+            accounts=[Account(kind="checking", name="Vadesiz TL Hesabı", iban=random_iban())],
+        )
+        session.add(customer)
+        try:
+            await session.commit()
+        except IntegrityError as error:
+            await session.rollback()
+            if "national_id_digest" in str(error.orig):
+                # Same person registering twice at the same moment.
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Bu bilgilerle yeni kayıt oluşturulamadı.",
+                ) from None
+            continue
+        return RegisterOut(customer_no=customer.customer_no, full_name=customer.full_name)
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Tekrar deneyin.")
 
 
 @router.post(
@@ -38,12 +97,8 @@ async def login(
     body: LoginRequest, request: Request, response: Response, session: SessionDep
 ) -> Token:
     settings = get_settings()
-    client_ip = request.client.host if request.client else "unknown"
-    if not login_limiter.allow(client_ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Çok fazla giriş denemesi yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.",
-        )
+    if not login_limiter.allow(_client_ip(request)):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=TOO_MANY_REQUESTS)
 
     now = datetime.now(UTC)
     customer = await session.scalar(

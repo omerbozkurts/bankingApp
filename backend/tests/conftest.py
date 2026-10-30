@@ -9,6 +9,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://abbank:abbank_dev@localhost:5434/abbank_test"
 )
 os.environ["JWT_SECRET"] = "test-only-secret-" + "x" * 40
+os.environ["NATIONAL_ID_PEPPER"] = "test-only-pepper-" + "y" * 40
 
 from collections.abc import AsyncIterator, Awaitable, Callable  # noqa: E402
 
@@ -19,7 +20,8 @@ from sqlalchemy import text  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Account, Base, Customer  # noqa: E402
-from app.routers.auth import login_limiter  # noqa: E402
+from app.routers.auth import login_limiter, register_limiter  # noqa: E402
+from app.routers.transfers import lookup_limiter  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 
@@ -42,6 +44,8 @@ async def clean_tables() -> None:
         )
     # Every test client uses the same IP, so start each test with a fresh login allowance.
     login_limiter.reset()
+    register_limiter.reset()
+    lookup_limiter.reset()
 
 
 @pytest.fixture

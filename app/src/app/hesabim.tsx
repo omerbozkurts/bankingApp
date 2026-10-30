@@ -84,18 +84,27 @@ export default function AccountScreen() {
             </ThemedText>
           </View>
 
-          <View style={styles.actions}>
-            <Button
-              title="Para gönder"
-              style={styles.action}
-              onPress={() => router.push('/gonder')}
-            />
-            <Button
-              title="Yeni hesap"
-              variant="secondary"
-              style={styles.action}
-              onPress={() => router.push('/hesap-ac')}
-            />
+          <View style={styles.actionGroup}>
+            <View style={styles.actions}>
+              <Button
+                title="Para gönder"
+                style={styles.action}
+                onPress={() => router.push('/gonder')}
+              />
+              <Button
+                title="Yeni hesap"
+                variant="secondary"
+                style={styles.action}
+                onPress={() => router.push('/hesap-ac')}
+              />
+            </View>
+            {customer.accounts.length >= 2 ? (
+              <Button
+                title="Hesaplarım arası"
+                variant="secondary"
+                onPress={() => router.push('/aktar')}
+              />
+            ) : null}
           </View>
 
           {refreshError ? (
@@ -187,6 +196,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     borderLeftWidth: 4,
     padding: Spacing.three,
+  },
+  actionGroup: {
+    gap: Spacing.three,
   },
   actions: {
     flexDirection: 'row',

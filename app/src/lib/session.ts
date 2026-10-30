@@ -18,6 +18,7 @@ let epoch = 0;
 // The in-flight logout, so a new sign-in waits for it instead of having its session cleared by it.
 let logoutInFlight: Promise<void> = Promise.resolve();
 let restoreStarted: Promise<void> | null = null;
+let refreshRequest = 0;
 
 function set(next: SessionState) {
   state = next;
@@ -69,9 +70,11 @@ export async function signIn(customerNo: string, password: string): Promise<void
 /** Reloads profile and balances. An expired session signs the user out. */
 export async function refreshCustomer(): Promise<void> {
   const started = epoch;
+  // Two refreshes can finish out of order; only the latest may replace the balances.
+  const request = ++refreshRequest;
   try {
     const customer = await api.fetchCustomer();
-    if (epoch === started) set({ status: 'signedIn', customer });
+    if (epoch === started && request === refreshRequest) set({ status: 'signedIn', customer });
   } catch (error) {
     if (epoch !== started) return;
     if (error instanceof api.ApiError && error.status === 401) await signOut();

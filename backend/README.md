@@ -44,7 +44,8 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 - Para tutarları `BigInteger` kuruş; negatif bakiye veritabanı kısıtıyla engellenir.
 - **Transfer:** müşteri satırı kilitlenir (aynı müşterinin transferleri sıraya girer), iki hesap id sırasıyla
   `FOR UPDATE` kilitlenir (karşılıklı transferde deadlock olmaz), bakiye kilitli satırdan okunur. Limitler:
-  işlem başına 50.000 TL, 24 saatte 100.000 TL. Aynı `idempotency_key` farklı içerikle gelirse `409`.
+  işlem başına 50.000 TL, 24 saatte 100.000 TL; kendi hesaplar arası aktarım bu limitlere tabi değil ve
+  günlük toplama sayılmaz. Aynı `idempotency_key` farklı içerikle gelirse `409`.
 - **Kayıt:** T.C. kimlik no algoritmik olarak doğrulanır ve düz metin saklanmaz; `NATIONAL_ID_PEPPER` ile
   HMAC özeti tutulur (kişi başına tek kayıt). 18 yaş sınırı, kolay şifre engeli, IP başına saatte 5 kayıt.
 - Alıcı sorgusu müşteri başına 5 dakikada 30 ile sınırlı (maskeli isim toplanmasın diye).

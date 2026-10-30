@@ -47,6 +47,10 @@ async def lookup_recipient(
     return RecipientOut(iban=account.iban, masked_name=mask_name(owner.full_name))
 
 
+def _description(body: TransferRequest, own: bool) -> str:
+    return body.description or ("Hesaplar arası transfer" if own else "Para transferi")
+
+
 async def _transfer_out(session: SessionDep, transfer: Transfer) -> TransferOut:
     to_account = await session.get(Account, transfer.to_account_id)
     debit = await session.scalar(
@@ -94,11 +98,15 @@ async def create_transfer(
     )
     if previous is not None:
         to_account = await session.get(Account, previous.to_account_id)
+        own = to_account is not None and to_account.customer_id == customer.id
+        # For own accounts a blank description matches either default: own transfers made before
+        # own-account support stored "Para transferi", and a retry of one must still replay.
+        descriptions = {_description(body, o) for o in ((True, False) if own else (False,))}
         same_request = (
-            previous.from_account_id == body.from_account_id
+            to_account is not None
+            and previous.from_account_id == body.from_account_id
             and previous.amount_kurus == body.amount_kurus
-            and previous.description == (body.description or "Para transferi")
-            and to_account is not None
+            and previous.description in descriptions
             and to_account.iban == body.to_iban
         )
         if not same_request:
@@ -108,31 +116,41 @@ async def create_transfer(
             )
         return await _transfer_out(session, previous)
 
-    if body.amount_kurus > settings.transfer_max_kurus:
-        max_tl = f"{settings.transfer_max_kurus // 100:,}".replace(",", ".")  # 50.000
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tek seferde en fazla {max_tl} TL gönderebilirsiniz.",
-        )
-
     from_account = await get_owned_account(session, customer.id, body.from_account_id)
     to_account = await _recipient_account(session, body.to_iban)
     if to_account.id == from_account.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Aynı hesaba para gönderilemez."
         )
+    # Moving money between the customer's own accounts never leaves them, so the transfer
+    # limits (there to cap losses from a stolen session) don't apply and it doesn't count.
+    own = to_account.customer_id == customer.id
 
-    since = datetime.now(UTC) - timedelta(hours=24)
-    sent_today = await session.scalar(
-        select(func.coalesce(func.sum(Transfer.amount_kurus), 0)).where(
-            Transfer.customer_id == customer.id, Transfer.created_at >= since
-        )
-    )
-    if sent_today + body.amount_kurus > settings.transfer_daily_max_kurus:
+    if not own and body.amount_kurus > settings.transfer_max_kurus:
+        max_tl = f"{settings.transfer_max_kurus // 100:,}".replace(",", ".")  # 50.000
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Günlük transfer limitinizi aşıyorsunuz. Lütfen daha düşük bir tutar deneyin.",
+            detail=f"Tek seferde en fazla {max_tl} TL gönderebilirsiniz.",
         )
+
+    if not own:
+        since = datetime.now(UTC) - timedelta(hours=24)
+        sent_today = await session.scalar(
+            select(func.coalesce(func.sum(Transfer.amount_kurus), 0))
+            .join(Account, Account.id == Transfer.to_account_id)
+            .where(
+                Transfer.customer_id == customer.id,
+                Transfer.created_at >= since,
+                Account.customer_id != customer.id,
+            )
+        )
+        if sent_today + body.amount_kurus > settings.transfer_daily_max_kurus:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Günlük transfer limitinizi aşıyorsunuz. Lütfen daha düşük bir tutar deneyin."
+                ),
+            )
 
     # Lock both accounts in id order so two opposite transfers can't deadlock each other.
     locked = {
@@ -153,7 +171,11 @@ async def create_transfer(
 
     recipient = await session.get(Customer, target.customer_id)
     assert recipient is not None
-    description = body.description or "Para transferi"
+    description = _description(body, own)
+    # Each side shows where the money went or came from: the other account's name for the
+    # customer's own accounts, otherwise the other customer's masked name.
+    debit_party = target.name if own else mask_name(recipient.full_name)
+    credit_party = source.name if own else mask_name(customer.full_name)
 
     source.balance_kurus -= body.amount_kurus
     target.balance_kurus += body.amount_kurus
@@ -175,7 +197,7 @@ async def create_transfer(
                 amount_kurus=-body.amount_kurus,
                 balance_after_kurus=source.balance_kurus,
                 description=description,
-                counterparty=mask_name(recipient.full_name),
+                counterparty=debit_party,
             ),
             Transaction(
                 account_id=target.id,
@@ -183,7 +205,7 @@ async def create_transfer(
                 amount_kurus=body.amount_kurus,
                 balance_after_kurus=target.balance_kurus,
                 description=description,
-                counterparty=mask_name(customer.full_name),
+                counterparty=credit_party,
             ),
         ]
     )

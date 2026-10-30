@@ -10,8 +10,9 @@ import { ChoiceList } from '@/components/ui/choice-list';
 import { Notice } from '@/components/ui/notice';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Summary } from '@/components/ui/summary';
 import { TextField } from '@/components/ui/text-field';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, createTransfer, lookupRecipient } from '@/lib/api';
 import { formatIban, isValidTrIban, normalizeIban } from '@/lib/banking';
@@ -67,6 +68,8 @@ export default function TransferScreen() {
   const from = accounts.find((a) => a.id === fromId) ?? accounts[0];
   const iban = normalizeIban(ibanInput);
   const amountKurus = parseTryAmount(amountInput);
+  // Sending to one of the customer's own accounts: no cap, and the API names the account.
+  const ownTarget = accounts.some((a) => a.iban === iban);
 
   async function onIbanChange(text: string) {
     const cleaned = normalizeIban(text).replace(/[^A-Z0-9]/g, '').slice(0, 26);
@@ -110,7 +113,7 @@ export default function TransferScreen() {
 
     if (!amountInput.trim()) next.amount = 'Tutarı girin.';
     else if (amountKurus === null) next.amount = 'Tutarı 1.250,50 biçiminde girin.';
-    else if (amountKurus > MAX_TRANSFER_KURUS)
+    else if (amountKurus > MAX_TRANSFER_KURUS && !ownTarget)
       next.amount = `Tek seferde en fazla ${formatKurus(MAX_TRANSFER_KURUS)} gönderebilirsiniz.`;
     else if (from && amountKurus > from.balanceKurus)
       next.amount = `Yetersiz bakiye. Kullanılabilir: ${formatKurus(from.balanceKurus)}.`;
@@ -178,7 +181,9 @@ export default function TransferScreen() {
           </ThemedText>
           <ThemedText type="title">{formatKurus(result.amountKurus)}</ThemedText>
           <ThemedText themeColor="textSecondary">
-            {result.recipient} adlı alıcıya gönderildi.
+            {ownTarget
+              ? `${result.recipient} hesabınıza gönderildi.`
+              : `${result.recipient} adlı alıcıya gönderildi.`}
           </ThemedText>
         </View>
         <Summary
@@ -223,7 +228,10 @@ export default function TransferScreen() {
             ['Alıcı', recipient.maskedName],
             ['Alıcı IBAN', formatIban(iban)],
             ['Gönderen hesap', `${from.name} · ${formatKurus(from.balanceKurus)}`],
-            ['Açıklama', description.trim() || 'Para transferi'],
+            [
+              'Açıklama',
+              description.trim() || (ownTarget ? 'Hesaplar arası transfer' : 'Para transferi'),
+            ],
           ]}
         />
         {sendError ? (
@@ -331,24 +339,6 @@ export default function TransferScreen() {
   );
 }
 
-function Summary({ rows }: { rows: [string, string][] }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.summary, { backgroundColor: theme.backgroundElement }]}>
-      {rows.map(([label, value]) => (
-        <View key={label} style={styles.summaryRow}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {label}
-          </ThemedText>
-          <ThemedText type="smallBold" selectable>
-            {value}
-          </ThemedText>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
@@ -366,13 +356,5 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.three,
-  },
-  summary: {
-    borderRadius: Radius.card,
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  summaryRow: {
-    gap: Spacing.half,
   },
 });

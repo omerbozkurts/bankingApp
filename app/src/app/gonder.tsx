@@ -16,7 +16,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, createTransfer, lookupRecipient } from '@/lib/api';
 import { formatIban, isValidTrIban, normalizeIban } from '@/lib/banking';
-import type { TransferResult } from '@/lib/models';
+import { debtKurus, type TransferResult } from '@/lib/models';
 import { formatKurus, parseTryAmount } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
 
@@ -65,11 +65,14 @@ export default function TransferScreen() {
   if (session.status === 'signedOut') return <Redirect href="/giris" />;
 
   const accounts = session.customer.accounts;
-  const from = accounts.find((a) => a.id === fromId) ?? accounts[0];
+  // A credit account only moves money between the customer's own accounts (see aktar.tsx).
+  const senders = accounts.filter((a) => a.kind !== 'credit');
+  const from = senders.find((a) => a.id === fromId) ?? senders[0];
   const iban = normalizeIban(ibanInput);
   const amountKurus = parseTryAmount(amountInput);
   // Sending to one of the customer's own accounts: no cap, and the API names the account.
   const ownTarget = accounts.some((a) => a.iban === iban);
+  const ownCredit = accounts.find((a) => a.iban === iban && a.kind === 'credit');
 
   async function onIbanChange(text: string) {
     const cleaned = normalizeIban(text).replace(/[^A-Z0-9]/g, '').slice(0, 26);
@@ -117,6 +120,11 @@ export default function TransferScreen() {
       next.amount = `Tek seferde en fazla ${formatKurus(MAX_TRANSFER_KURUS)} gönderebilirsiniz.`;
     else if (from && amountKurus > from.balanceKurus)
       next.amount = `Yetersiz bakiye. Kullanılabilir: ${formatKurus(from.balanceKurus)}.`;
+    else if (ownCredit && amountKurus > debtKurus(ownCredit))
+      next.amount =
+        debtKurus(ownCredit) === 0
+          ? 'Bu kredili hesapta borcunuz yok.'
+          : `Ödeme borcunuzdan fazla olamaz. Borç: ${formatKurus(debtKurus(ownCredit))}.`;
 
     if (description.length > 140) next.description = 'Açıklama en fazla 140 karakter olabilir.';
 
@@ -271,7 +279,7 @@ export default function TransferScreen() {
           label="Gönderen hesap"
           value={from?.id ?? null}
           onChange={setFromId}
-          choices={accounts.map((a) => ({
+          choices={senders.map((a) => ({
             value: a.id,
             title: a.name,
             detail: formatKurus(a.balanceKurus),

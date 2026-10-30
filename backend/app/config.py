@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     transfer_max_kurus: int = 5_000_000
     transfer_daily_max_kurus: int = 10_000_000
 
+    # Interest-free revolving credit: every customer can open one credit account with this limit.
+    credit_limit_kurus: int = 2_000_000  # 20.000 TL
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -15,7 +15,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, createTransfer } from '@/lib/api';
-import type { TransferResult } from '@/lib/models';
+import { availableKurus, debtKurus, type Account, type TransferResult } from '@/lib/models';
 import { formatKurus, parseTryAmount } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
 
@@ -105,8 +105,16 @@ export default function OwnTransferScreen() {
     const next: Errors = {};
     if (!amountInput.trim()) next.amount = 'Tutarı girin.';
     else if (amountKurus === null) next.amount = 'Tutarı 1.250,50 biçiminde girin.';
-    else if (!balancesStale && !reloading && amountKurus > from.balanceKurus)
-      next.amount = `Yetersiz bakiye. Kullanılabilir: ${formatKurus(from.balanceKurus)}.`;
+    else if (!balancesStale && !reloading && amountKurus > availableKurus(from))
+      next.amount =
+        from.kind === 'credit'
+          ? `Kullanılabilir limit yetersiz. Kullanılabilir: ${formatKurus(availableKurus(from))}.`
+          : `Yetersiz bakiye. Kullanılabilir: ${formatKurus(from.balanceKurus)}.`;
+    else if (!balancesStale && !reloading && to.kind === 'credit' && amountKurus > debtKurus(to))
+      next.amount =
+        debtKurus(to) === 0
+          ? 'Bu kredili hesapta borcunuz yok.'
+          : `Ödeme borcunuzdan fazla olamaz. Borç: ${formatKurus(debtKurus(to))}.`;
     if (description.length > 140) next.description = 'Açıklama en fazla 140 karakter olabilir.';
 
     setErrors(next);
@@ -201,8 +209,8 @@ export default function OwnTransferScreen() {
         <Summary
           rows={[
             ['Tutar', formatKurus(amountKurus)],
-            ['Gönderen hesap', `${from.name} · ${formatKurus(from.balanceKurus)}`],
-            ['Alıcı hesap', `${to.name} · ${formatKurus(to.balanceKurus)}`],
+            ['Gönderen hesap', `${from.name} · ${accountDetail(from)}`],
+            ['Alıcı hesap', `${to.name} · ${accountDetail(to)}`],
             ['Açıklama', description.trim() || 'Hesaplar arası transfer'],
           ]}
         />
@@ -255,7 +263,7 @@ export default function OwnTransferScreen() {
           choices={accounts.map((a) => ({
             value: a.id,
             title: a.name,
-            detail: formatKurus(a.balanceKurus),
+            detail: accountDetail(a),
           }))}
         />
         <ChoiceList
@@ -265,7 +273,7 @@ export default function OwnTransferScreen() {
           choices={targets.map((a) => ({
             value: a.id,
             title: a.name,
-            detail: formatKurus(a.balanceKurus),
+            detail: accountDetail(a),
           }))}
         />
 
@@ -302,6 +310,12 @@ export default function OwnTransferScreen() {
       <Button title="Devam" onPress={goToConfirm} />
     </Screen>
   );
+}
+
+/** Balance for regular accounts; debt and what's left of the limit for a credit account. */
+function accountDetail(account: Account): string {
+  if (account.kind !== 'credit') return formatKurus(account.balanceKurus);
+  return `Borç ${formatKurus(debtKurus(account))}, kullanılabilir ${formatKurus(availableKurus(account))}`;
 }
 
 const styles = StyleSheet.create({

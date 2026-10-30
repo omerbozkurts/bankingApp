@@ -10,8 +10,8 @@ from tests.conftest import login
 async def test_accounts_are_owned_ordered_and_integer_kurus(client, create_customer):
     owner = await create_customer(
         accounts=[
-            {"id": 30, "name": "Savings", "iban": "TR001", "balance_kurus": 12345,
-             "goal_kurus": 100001},
+            {"id": 30, "kind": "savings", "name": "Savings", "iban": "TR001",
+             "balance_kurus": 12345, "goal_kurus": 100001},
             {"id": 10, "name": "Current", "iban": "TR002", "balance_kurus": 0},
         ]
     )
@@ -58,7 +58,7 @@ async def test_negative_account_balance_rejected(create_customer):
         with pytest.raises(IntegrityError) as error:
             await session.commit()
         await session.rollback()
-        assert "ck_accounts_balance_non_negative" in str(error.value)
+        assert "ck_accounts_balance_within_limit" in str(error.value)
 
 
 async def test_zero_transaction_amount_rejected(create_customer):

@@ -1,14 +1,16 @@
 // App-side shapes, and their mapping from the API's snake_case JSON (backend/app/schemas.py).
 
-export type AccountKind = 'checking' | 'savings';
+export type AccountKind = 'checking' | 'savings' | 'credit';
 
 export type Account = {
   id: number;
   kind: AccountKind;
   name: string;
   iban: string;
+  /** Negative on a credit account: the amount owed. */
   balanceKurus: number;
   goalKurus: number | null;
+  creditLimitKurus: number | null;
 };
 
 export type Customer = {
@@ -50,6 +52,7 @@ export type ApiAccount = {
   iban: string;
   balance_kurus: number;
   goal_kurus: number | null;
+  credit_limit_kurus: number | null;
 };
 
 export type ApiTransaction = {
@@ -80,6 +83,7 @@ export function toAccount(a: ApiAccount): Account {
     iban: a.iban,
     balanceKurus: a.balance_kurus,
     goalKurus: a.goal_kurus,
+    creditLimitKurus: a.credit_limit_kurus,
   };
 }
 
@@ -111,6 +115,17 @@ export function toTransferResult(t: ApiTransfer): TransferResult {
   };
 }
 
+/** What the customer owns: credit accounts are borrowed money, so they don't count. */
 export function totalBalance(customer: Customer): number {
-  return customer.accounts.reduce((sum, a) => sum + a.balanceKurus, 0);
+  return customer.accounts.reduce((sum, a) => (a.kind === 'credit' ? sum : sum + a.balanceKurus), 0);
+}
+
+/** What can be sent from the account: the balance, plus the limit for a credit account. */
+export function availableKurus(account: Account): number {
+  return account.balanceKurus + (account.creditLimitKurus ?? 0);
+}
+
+/** Amount owed on a credit account; 0 for other accounts. */
+export function debtKurus(account: Account): number {
+  return account.kind === 'credit' ? -account.balanceKurus : 0;
 }

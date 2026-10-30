@@ -82,15 +82,17 @@ class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    kind: Literal["checking", "savings"]
+    kind: Literal["checking", "savings", "credit"]
     name: str
     iban: str
+    # Negative on a credit account: the amount owed.
     balance_kurus: int
     goal_kurus: int | None
+    credit_limit_kurus: int | None
 
 
 class OpenAccountRequest(BaseModel):
-    kind: Literal["checking", "savings"]
+    kind: Literal["checking", "savings", "credit"]
     name: Annotated[str, Field(min_length=1, max_length=80), AfterValidator(str.strip)]
     goal_kurus: int | None = Field(default=None, gt=0, le=100_000_000_000)
 
@@ -98,7 +100,7 @@ class OpenAccountRequest(BaseModel):
     def goal_only_for_savings(self) -> OpenAccountRequest:
         if not self.name:
             raise ValueError("Hesap adı boş olamaz.")
-        if self.kind == "checking" and self.goal_kurus is not None:
+        if self.kind != "savings" and self.goal_kurus is not None:
             raise ValueError("Birikim hedefi yalnızca birikim hesaplarında belirlenebilir.")
         return self
 

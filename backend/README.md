@@ -25,7 +25,7 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `POST` | `/auth/logout` | Web oturum çerezini siler |
 | `GET` | `/me` | Giriş yapmış müşteri (Bearer token veya web çerezi) |
 | `GET` | `/accounts` | Müşterinin hesapları; tutarlar **kuruş** cinsinden tam sayı |
-| `POST` | `/accounts` | Yeni hesap (`checking` / `savings` + isteğe bağlı hedef); geçerli TR IBAN üretilir |
+| `POST` | `/accounts` | Yeni hesap (`checking` / `savings` + isteğe bağlı hedef / `credit`); geçerli TR IBAN üretilir |
 | `GET` | `/accounts/{id}/transactions` | Hareketler, yeniden eskiye; `?limit=20&before_id=` ile sayfalama |
 | `GET` | `/recipients/lookup?iban=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
 | `POST` | `/transfers` | Para transferi; `idempotency_key` aynı isteğin iki kez ödenmesini engeller |
@@ -46,6 +46,10 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
   `FOR UPDATE` kilitlenir (karşılıklı transferde deadlock olmaz), bakiye kilitli satırdan okunur. Limitler:
   işlem başına 50.000 TL, 24 saatte 100.000 TL; kendi hesaplar arası aktarım bu limitlere tabi değil ve
   günlük toplama sayılmaz. Aynı `idempotency_key` farklı içerikle gelirse `409`.
+- **Kredili hesap:** müşteri başına bir tane, faizsiz döner limit (varsayılan 20.000 TL, `credit_limit_kurus`).
+  Bakiye borcu gösterir (≤ 0) ve limitin altına inemez; bu kurallar veritabanı kısıtıyla da korunur. Yalnızca
+  kendi hesaplar arasında kullanılır: limitten çekim ve borç kadar geri ödeme. Başka müşterinin kredili hesabı
+  alıcı sorgusunda ve transferde bulunamaz sayılır.
 - **Kayıt:** T.C. kimlik no algoritmik olarak doğrulanır ve düz metin saklanmaz; `NATIONAL_ID_PEPPER` ile
   HMAC özeti tutulur (kişi başına tek kayıt). 18 yaş sınırı, kolay şifre engeli, IP başına saatte 5 kayıt.
 - Alıcı sorgusu müşteri başına 5 dakikada 30 ile sınırlı (maskeli isim toplanmasın diye).

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.banking import random_iban
+from app.config import get_settings
 from app.deps import CurrentCustomer, SessionDep
 from app.models import Account, Customer, Transaction
 from app.schemas import AccountOut, OpenAccountRequest, TransactionOut, TransactionPage
@@ -42,6 +43,16 @@ async def open_account(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"En fazla {MAX_ACCOUNTS_PER_CUSTOMER} hesap açabilirsiniz.",
         )
+    credit_limit = None
+    if body.kind == "credit":
+        has_credit = await session.scalar(
+            select(Account.id).where(Account.customer_id == customer.id, Account.kind == "credit")
+        )
+        if has_credit is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Zaten bir kredili hesabınız var."
+            )
+        credit_limit = get_settings().credit_limit_kurus
     # A random 16-digit account number collides with negligible probability; retry just in case.
     # Each attempt is a savepoint, so a collision keeps the customer lock and the count above valid.
     for _ in range(3):
@@ -52,6 +63,7 @@ async def open_account(
             iban=random_iban(),
             balance_kurus=0,
             goal_kurus=body.goal_kurus,
+            credit_limit_kurus=credit_limit,
         )
         try:
             async with session.begin_nested():

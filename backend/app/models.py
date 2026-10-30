@@ -8,10 +8,12 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     MetaData,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -53,9 +55,27 @@ class Customer(Base):
 class Account(Base):
     __tablename__ = "accounts"
     __table_args__ = (
-        CheckConstraint("balance_kurus >= 0", name="balance_non_negative"),
+        # Only a credit account may go below zero, and never past its limit.
+        CheckConstraint(
+            "balance_kurus >= -COALESCE(credit_limit_kurus, 0)", name="balance_within_limit"
+        ),
         CheckConstraint("goal_kurus IS NULL OR goal_kurus > 0", name="goal_positive"),
-        CheckConstraint("kind IN ('checking', 'savings')", name="kind_valid"),
+        CheckConstraint("kind IN ('checking', 'savings', 'credit')", name="kind_valid"),
+        # Credit accounts, and only they, have a limit; their balance is the debt (<= 0).
+        CheckConstraint(
+            "(kind = 'credit') = (credit_limit_kurus IS NOT NULL)", name="credit_limit_iff_credit"
+        ),
+        CheckConstraint(
+            "credit_limit_kurus IS NULL OR credit_limit_kurus > 0", name="credit_limit_positive"
+        ),
+        CheckConstraint("kind <> 'credit' OR balance_kurus <= 0", name="credit_not_positive"),
+        CheckConstraint("kind = 'savings' OR goal_kurus IS NULL", name="goal_only_savings"),
+        Index(
+            "uq_accounts_one_credit_per_customer",
+            "customer_id",
+            unique=True,
+            postgresql_where=text("kind = 'credit'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -66,11 +86,17 @@ class Account(Base):
     iban: Mapped[str] = mapped_column(String(34), unique=True)
     balance_kurus: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     goal_kurus: Mapped[int | None] = mapped_column(BigInteger)
+    credit_limit_kurus: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     customer: Mapped[Customer] = relationship(back_populates="accounts")
+
+    @property
+    def available_kurus(self) -> int:
+        """What can be sent from this account: the balance, plus the limit for credit accounts."""
+        return self.balance_kurus + (self.credit_limit_kurus or 0)
 
 
 class Transfer(Base):

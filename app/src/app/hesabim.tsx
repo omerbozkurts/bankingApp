@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { formatIban } from '@/lib/banking';
-import { totalBalance, type Account } from '@/lib/models';
+import { availableKurus, debtKurus, totalBalance, type Account } from '@/lib/models';
 import { formatKurus, goalProgress } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
 
@@ -133,11 +133,15 @@ function AccountCard({ account }: { account: Account }) {
   const theme = useTheme();
   const goal = account.goalKurus;
   const progress = goal !== null ? goalProgress(account.balanceKurus, goal) : null;
+  const credit = account.kind === 'credit';
+  const amount = credit
+    ? `Borç ${formatKurus(debtKurus(account))}`
+    : formatKurus(account.balanceKurus);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${account.name}, ${formatKurus(account.balanceKurus)}. Hareketleri gör`}
+      accessibilityLabel={`${account.name}, ${amount}. Hareketleri gör`}
       onPress={() => router.push({ pathname: '/hesap/[id]', params: { id: String(account.id) } })}
       style={({ pressed }) => [
         styles.card,
@@ -147,7 +151,13 @@ function AccountCard({ account }: { account: Account }) {
       <ThemedText type="label" themeColor="textSecondary">
         {account.name}
       </ThemedText>
-      <ThemedText type="subtitle">{formatKurus(account.balanceKurus)}</ThemedText>
+      <ThemedText type="subtitle">{amount}</ThemedText>
+      {credit ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          Kullanılabilir limit {formatKurus(availableKurus(account))} /{' '}
+          {formatKurus(account.creditLimitKurus ?? 0)}
+        </ThemedText>
+      ) : null}
       <ThemedText type="small" themeColor="textSecondary">
         {formatIban(account.iban)}
       </ThemedText>

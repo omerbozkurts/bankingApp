@@ -18,7 +18,11 @@ import { refreshCustomer, signOut, useSession } from '@/lib/session';
 const DEFAULT_NAMES: Record<AccountKind, string> = {
   checking: 'Vadesiz TL Hesabı',
   savings: 'Birikim Hesabı',
+  credit: 'Kredili Hesap',
 };
+
+// Mirrors the API's credit limit (backend/app/config.py: credit_limit_kurus).
+const CREDIT_LIMIT_KURUS = 2_000_000;
 
 export default function OpenAccountScreen() {
   const session = useSession();
@@ -32,6 +36,9 @@ export default function OpenAccountScreen() {
   if (session.status === 'signedOut') return <Redirect href="/giris" />;
 
   const goalKurus = goalInput.trim() ? parseTryAmount(goalInput) : null;
+  // One credit account per customer: don't offer a second.
+  const hasCredit =
+    session.status === 'signedIn' && session.customer.accounts.some((a) => a.kind === 'credit');
 
   async function submit() {
     if (submitting) return;
@@ -85,6 +92,15 @@ export default function OpenAccountScreen() {
           choices={[
             { value: 'savings', title: 'Birikim hesabı', detail: 'Hedef belirleyin, ilerlemenizi görün' },
             { value: 'checking', title: 'Vadesiz hesap', detail: 'Günlük harcama ve transferler için' },
+            ...(hasCredit
+              ? []
+              : [
+                  {
+                    value: 'credit' as const,
+                    title: 'Kredili hesap',
+                    detail: `${formatKurus(CREDIT_LIMIT_KURUS)} limit, faizsiz`,
+                  },
+                ]),
           ]}
         />
         <TextField
@@ -111,6 +127,14 @@ export default function OpenAccountScreen() {
               </ThemedText>
             ) : null}
           </View>
+        ) : null}
+        {kind === 'credit' ? (
+          <Notice tone="info">
+            <ThemedText type="small">
+              Limitten dilediğiniz zaman kendi hesaplarınıza para aktarabilir, borcunuzu yine
+              hesaplarınız arasından geri ödeyebilirsiniz. Faiz uygulanmaz.
+            </ThemedText>
+          </Notice>
         ) : null}
       </View>
 

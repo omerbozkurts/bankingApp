@@ -46,7 +46,7 @@ npx expo export --platform web   # statik web çıktısı → dist/
 | `src/lib/api.ts` | API istemcisi (zaman aşımı, Türkçe hata mesajları) |
 | `src/lib/session.ts` | Oturum durumu: açılışta geri yükleme, giriş, yenileme, çıkış |
 | `src/lib/token-store*.ts` | Mobil: token `expo-secure-store`'da · Web: httpOnly çerez (JS'te token yok) |
-| `src/lib/` (diğer) | IBAN/T.C. doğrulama, Türkçe tutar okuma (`1.250,50` → kuruş), form kuralları, API → uygulama eşlemesi |
+| `src/lib/` (diğer) | IBAN/T.C. doğrulama, Türkçe tutar okuma (`1.250,50` → kuruş), form kuralları, API → uygulama eşlemesi, kredi borcu / kullanılabilir limit |
 | `assets/images/` | Uygulama ikonu, Android uyarlanabilir/tek renk ikon, açılış görseli, favicon |
 
 Marka kuralları: [`../logo/brand/MARKA.md`](../logo/brand/MARKA.md)

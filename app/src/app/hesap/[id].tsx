@@ -12,7 +12,7 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, fetchMovements } from '@/lib/api';
 import { formatIban } from '@/lib/banking';
-import type { Movement } from '@/lib/models';
+import { debtKurus, type Movement } from '@/lib/models';
 import { formatKurus } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
 
@@ -120,15 +120,26 @@ export default function AccountDetailScreen() {
       <ScreenHeader fallback="/hesabim" />
       <View style={styles.copy}>
         <ThemedText themeColor="textSecondary">{account.name}</ThemedText>
-        <ThemedText type="title">{formatKurus(account.balanceKurus)}</ThemedText>
+        <ThemedText type="title">
+          {account.kind === 'credit'
+            ? `Borç ${formatKurus(debtKurus(account))}`
+            : formatKurus(account.balanceKurus)}
+        </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" selectable>
           {formatIban(account.iban)}
         </ThemedText>
       </View>
-      <Button
-        title="Bu hesaptan para gönder"
-        onPress={() => router.push({ pathname: '/gonder', params: { hesap: String(account.id) } })}
-      />
+      {account.kind === 'credit' ? (
+        <Button
+          title="Hesaplarıma aktar"
+          onPress={() => router.push({ pathname: '/aktar', params: { hesap: String(account.id) } })}
+        />
+      ) : (
+        <Button
+          title="Bu hesaptan para gönder"
+          onPress={() => router.push({ pathname: '/gonder', params: { hesap: String(account.id) } })}
+        />
+      )}
       <ThemedText type="subtitle">Hesap hareketleri</ThemedText>
       {error ? (
         <Notice tone="error">

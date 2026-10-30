@@ -42,6 +42,9 @@ async def lookup_recipient(
             detail="Çok fazla alıcı sorgusu yaptınız. Lütfen birkaç dakika sonra tekrar deneyin.",
         )
     account = await _recipient_account(session, iban)
+    # Someone else's credit account can't receive transfers, so don't reveal its owner either.
+    if account.kind == "credit" and account.customer_id != customer.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=UNKNOWN_IBAN)
     owner = await session.get(Customer, account.customer_id)
     assert owner is not None
     return RecipientOut(iban=account.iban, masked_name=mask_name(owner.full_name))
@@ -118,6 +121,9 @@ async def create_transfer(
 
     from_account = await get_owned_account(session, customer.id, body.from_account_id)
     to_account = await _recipient_account(session, body.to_iban)
+    # Matches the lookup: someone else's credit account doesn't exist as far as senders know.
+    if to_account.kind == "credit" and to_account.customer_id != customer.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=UNKNOWN_IBAN)
     if to_account.id == from_account.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Aynı hesaba para gönderilemez."
@@ -166,8 +172,20 @@ async def create_transfer(
         )
     }
     source, target = locked[from_account.id], locked[to_account.id]
-    if source.balance_kurus < body.amount_kurus:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Yetersiz bakiye.")
+    # Credit accounts only move money between the owner's accounts: draw to, repay from.
+    if not own and "credit" in (source.kind, target.kind):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kredili hesap yalnızca kendi hesaplarınız arasında kullanılabilir.",
+        )
+    if source.available_kurus < body.amount_kurus:
+        detail = "Kullanılabilir limit yetersiz." if source.kind == "credit" else "Yetersiz bakiye."
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+    if target.kind == "credit" and body.amount_kurus > -target.balance_kurus:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ödeme tutarı kredi borcunuzdan fazla olamaz.",
+        )
 
     recipient = await session.get(Customer, target.customer_id)
     assert recipient is not None

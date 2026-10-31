@@ -1,23 +1,10 @@
 """Web session: httpOnly cookie plus the X-Requested-With CSRF header."""
 
-from collections.abc import AsyncIterator
-
-import httpx
-import pytest
 
 from app.config import get_settings
-from app.main import app
 from tests.conftest import login
 
 CSRF = {"X-Requested-With": "abbank"}
-
-
-@pytest.fixture
-async def web_client() -> AsyncIterator[httpx.AsyncClient]:
-    # https so httpx sends back the Secure cookie, like a browser would.
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="https://test") as c:
-        yield c
 
 
 async def test_login_sets_hardened_session_cookie(web_client, create_customer):

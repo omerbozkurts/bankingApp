@@ -135,6 +135,14 @@ export default function AccountScreen() {
               <ThemedText themeColor="textSecondary">Henüz bir hesabınız yok.</ThemedText>
             ) : null}
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={12}
+            style={styles.settingsLink}
+            onPress={() => router.push('/sifre')}>
+            <ThemedText type="label">Şifre değiştir</ThemedText>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -239,6 +247,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  settingsLink: {
+    alignSelf: 'center',
   },
   card: {
     borderRadius: Radius.card,

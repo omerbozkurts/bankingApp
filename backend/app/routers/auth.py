@@ -1,17 +1,26 @@
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.banking import national_id_digest, random_iban
 from app.config import get_settings
-from app.deps import SESSION_MODE_HEADER, SessionDep, require_csrf_header
+from app.deps import (
+    SESSION_MODE_HEADER,
+    CurrentCustomer,
+    SessionDep,
+    bearer,
+    require_csrf_header,
+    require_current_session,
+)
 from app.models import Account, Customer
 from app.rate_limit import SlidingWindowLimiter
-from app.schemas import LoginRequest, RegisterOut, RegisterRequest, Token
+from app.schemas import ChangePasswordRequest, LoginRequest, RegisterOut, RegisterRequest, Token
 from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -129,9 +138,15 @@ async def login(
     customer.failed_login_count = 0
     customer.locked_until = None
     await session.commit()
+    return _start_session(
+        customer, response, cookie=request.headers.get(SESSION_MODE_HEADER) == "cookie"
+    )
 
-    token, expires_in = create_access_token(customer.id)
-    if request.headers.get(SESSION_MODE_HEADER) != "cookie":
+
+def _start_session(customer: Customer, response: Response, *, cookie: bool) -> Token:
+    settings = get_settings()
+    token, expires_in = create_access_token(customer.id, customer.session_version)
+    if not cookie:
         # Mobile: token in the body only, kept in the device's secure storage.
         return Token(access_token=token, token_type="bearer", expires_in=expires_in)
 
@@ -146,6 +161,64 @@ async def login(
         path="/",
     )
     return Token(token_type="cookie", expires_in=expires_in)
+
+
+@router.post(
+    "/change-password",
+    response_model_exclude_none=True,
+    responses={
+        400: {"description": "Mevcut şifre hatalı veya yeni şifre uygun değil"},
+        429: {"description": "Art arda hatalı mevcut şifre; geçici kilit"},
+    },
+)
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    response: Response,
+    customer: CurrentCustomer,
+    session: SessionDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> Token:
+    """Sets a new password and signs out every other session; this one gets a fresh token.
+
+    A wrong current password counts as a failed login, so a stolen session can't be used to
+    guess the password: after the same number of misses both login and this endpoint lock.
+    """
+    settings = get_settings()
+    now = datetime.now(UTC)
+    # Same lock as a login, so the failure count can't be raced.
+    await session.scalar(
+        select(Customer)
+        .where(Customer.id == customer.id)
+        .with_for_update()
+        # Refreshes `customer` (same identity) with the locked row's counters.
+        .execution_options(populate_existing=True)
+    )
+    require_current_session(request, customer)
+    if customer.locked_until is not None and customer.locked_until > now:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=TOO_MANY_REQUESTS)
+    if not await run_in_threadpool(verify_password, body.current_password, customer.password_hash):
+        customer.failed_login_count += 1
+        if customer.failed_login_count >= settings.max_failed_logins:
+            customer.locked_until = now + timedelta(minutes=settings.lockout_minutes)
+            customer.failed_login_count = 0
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Mevcut şifreniz hatalı."
+        )
+    if body.new_password == body.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Yeni şifre mevcut şifrenizle aynı olamaz.",
+        )
+
+    customer.password_hash = await run_in_threadpool(hash_password, body.new_password)
+    customer.failed_login_count = 0
+    customer.session_version += 1
+    await session.commit()
+    # Answer the way the request was authenticated (deps._request_token): a Bearer token from the
+    # mobile app gets a token back, the web session cookie gets a new cookie.
+    return _start_session(customer, response, cookie=credentials is None)
 
 
 @router.post(

@@ -3,7 +3,13 @@ import { test } from 'node:test';
 // @ts-ignore -- Node 24 provides this module; no extra dependency is needed to run it.
 import assert from 'node:assert/strict';
 
-import { ageOn, formatDateInput, parseTrDate, validateRegister } from './validation.ts';
+import {
+  ageOn,
+  formatDateInput,
+  parseTrDate,
+  validateChangePassword,
+  validateRegister,
+} from './validation.ts';
 
 const TODAY = new Date(2026, 9, 28); // 28.10.2026
 const OK = {
@@ -59,4 +65,34 @@ test('ardışık olmayan şifreler kabul edilir (backend ile aynı kural)', () =
   for (const password of ['789876', '898765', '482913']) {
     assert.equal(validateRegister({ ...OK, password, passwordRepeat: password }, TODAY).password, undefined, password);
   }
+});
+
+test('validateChangePassword geçerli girdide hata vermez', () => {
+  assert.deepEqual(
+    validateChangePassword({ current: '123456', password: '246813', passwordRepeat: '246813' }),
+    {},
+  );
+});
+
+test('validateChangePassword boş, kolay, aynı ve eşleşmeyen şifreleri yakalar', () => {
+  assert.deepEqual(validateChangePassword({ current: '', password: '', passwordRepeat: '' }), {
+    current: 'Mevcut şifrenizi girin.',
+    password: 'Bir şifre belirleyin.',
+    passwordRepeat: 'Şifrenizi tekrar girin.',
+  });
+  assert.match(
+    validateChangePassword({ current: '123456', password: '111111', passwordRepeat: '111111' })
+      .password!,
+    /kolay/,
+  );
+  assert.equal(
+    validateChangePassword({ current: '246813', password: '246813', passwordRepeat: '246813' })
+      .password,
+    'Yeni şifre mevcut şifrenizle aynı olamaz.',
+  );
+  assert.equal(
+    validateChangePassword({ current: '123456', password: '246813', passwordRepeat: '246812' })
+      .passwordRepeat,
+    'Şifreler eşleşmiyor.',
+  );
 });

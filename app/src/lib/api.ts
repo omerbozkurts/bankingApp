@@ -108,6 +108,18 @@ export async function login(customerNo: string, password: string): Promise<void>
   if (body.access_token) await setToken(body.access_token);
 }
 
+/**
+ * Sets a new password. The API signs out every session, so the new token replaces this one
+ * (native: stored here; web: the response sets a new cookie).
+ */
+export async function changePassword(current: string, password: string): Promise<void> {
+  const body = await request<{ access_token?: string }>('/auth/change-password', {
+    method: 'POST',
+    body: { current_password: current, new_password: password },
+  });
+  if (body.access_token) await setToken(body.access_token);
+}
+
 /** Native: deletes the stored token. Web: asks the API to clear the cookie (can fail offline). */
 export async function logout(): Promise<void> {
   if (usesBearerToken) {

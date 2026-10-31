@@ -66,6 +66,11 @@ class RegisterRequest(BaseModel):
     password: Annotated[str, Field(pattern=r"^[0-9]{6}$"), AfterValidator(_new_password)]
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(pattern=r"^[0-9]{6}$")
+    new_password: Annotated[str, Field(pattern=r"^[0-9]{6}$"), AfterValidator(_new_password)]
+
+
 class RegisterOut(BaseModel):
     customer_no: str
     full_name: str

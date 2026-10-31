@@ -82,17 +82,48 @@ export function validateRegister(f: RegisterFields, today: Date = new Date()): R
     else if (age < 18) errors.birthDate = 'Hesap açmak için 18 yaşından büyük olmalısınız.';
   }
 
-  if (!f.password) errors.password = 'Bir şifre belirleyin.';
-  else if (!/^\d{6}$/.test(f.password)) errors.password = 'Şifre 6 haneli olmalı.';
-  else if (
-    /^(\d)\1{5}$/.test(f.password) ||
-    '0123456789'.includes(f.password) ||
-    '9876543210'.includes(f.password)
+  const password = newPasswordError(f.password);
+  if (password) errors.password = password;
+  const repeat = repeatError(f.password, f.passwordRepeat);
+  if (repeat) errors.passwordRepeat = repeat;
+
+  return errors;
+}
+
+/** Same rules as the API (backend/app/schemas.py: _new_password). */
+function newPasswordError(password: string): string | undefined {
+  if (!password) return 'Bir şifre belirleyin.';
+  if (!/^\d{6}$/.test(password)) return 'Şifre 6 haneli olmalı.';
+  if (
+    /^(\d)\1{5}$/.test(password) ||
+    '0123456789'.includes(password) ||
+    '9876543210'.includes(password)
   )
-    errors.password = 'Tahmin edilmesi kolay bir şifre seçmeyin (111111, 123456 gibi).';
+    return 'Tahmin edilmesi kolay bir şifre seçmeyin (111111, 123456 gibi).';
+}
 
-  if (!f.passwordRepeat) errors.passwordRepeat = 'Şifrenizi tekrar girin.';
-  else if (f.passwordRepeat !== f.password) errors.passwordRepeat = 'Şifreler eşleşmiyor.';
+function repeatError(password: string, repeat: string): string | undefined {
+  if (!repeat) return 'Şifrenizi tekrar girin.';
+  if (repeat !== password) return 'Şifreler eşleşmiyor.';
+}
 
+export type ChangePasswordFields = {
+  current: string;
+  password: string;
+  passwordRepeat: string;
+};
+
+export type ChangePasswordErrors = Partial<Record<keyof ChangePasswordFields, string>>;
+
+export function validateChangePassword(f: ChangePasswordFields): ChangePasswordErrors {
+  const errors: ChangePasswordErrors = {};
+  if (!f.current) errors.current = 'Mevcut şifrenizi girin.';
+  else if (!/^\d{6}$/.test(f.current)) errors.current = 'Şifre 6 haneli olmalı.';
+
+  const password = newPasswordError(f.password);
+  if (password) errors.password = password;
+  else if (f.password === f.current) errors.password = 'Yeni şifre mevcut şifrenizle aynı olamaz.';
+  const repeat = repeatError(f.password, f.passwordRepeat);
+  if (repeat) errors.passwordRepeat = repeat;
   return errors;
 }

@@ -57,6 +57,14 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
         yield c
 
 
+@pytest.fixture
+async def web_client() -> AsyncIterator[httpx.AsyncClient]:
+    # https so httpx sends back the Secure cookie, like a browser would.
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="https://test") as c:
+        yield c
+
+
 CreateCustomer = Callable[..., Awaitable[Customer]]
 
 

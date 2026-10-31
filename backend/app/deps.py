@@ -51,13 +51,23 @@ async def get_current_customer(
     session: SessionDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> Customer:
-    customer_id = decode_access_token(_request_token(request, credentials))
-    if customer_id is None:
+    decoded = decode_access_token(_request_token(request, credentials))
+    if decoded is None:
         raise _unauthorized()
+    customer_id, version = decoded
     customer = await session.get(Customer, customer_id)
-    if customer is None:
+    # A password change bumps the version, which signs out every older token.
+    if customer is None or customer.session_version != version:
         raise _unauthorized()
+    request.state.session_version = version
     return customer
+
+
+def require_current_session(request: Request, customer: Customer) -> None:
+    """Checks the token again after the customer row was re-read under a lock: a password change
+    that committed after get_current_customer ran has revoked this request's session."""
+    if customer.session_version != request.state.session_version:
+        raise _unauthorized()
 
 
 CurrentCustomer = Annotated[Customer, Depends(get_current_customer)]

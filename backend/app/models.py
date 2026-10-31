@@ -44,6 +44,8 @@ class Customer(Base):
     birth_date: Mapped[date | None] = mapped_column(Date)
     failed_login_count: Mapped[int] = mapped_column(default=0, server_default="0")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Part of every access token; bumping it (password change) ends all existing sessions.
+    session_version: Mapped[int] = mapped_column(default=0, server_default="0")
     # Granted from the command line (scripts/make_admin.py), never through the API.
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(

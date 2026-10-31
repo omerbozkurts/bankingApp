@@ -24,6 +24,7 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `POST` | `/auth/register` | `{national_id, full_name, birth_date, password}` → `{customer_no}`; vadesiz hesap açılır |
 | `POST` | `/auth/login` | `{customer_no, password}` → `{access_token, token_type, expires_in}` + web oturum çerezi |
 | `POST` | `/auth/logout` | Web oturum çerezini siler |
+| `POST` | `/auth/change-password` | `{current_password, new_password}` → yeni token/çerez; diğer tüm oturumlar kapanır |
 | `GET` | `/me` | Giriş yapmış müşteri (Bearer token veya web çerezi) |
 | `GET` | `/accounts` | Müşterinin hesapları; tutarlar **kuruş** cinsinden tam sayı |
 | `POST` | `/accounts` | Yeni hesap (`checking` / `savings` + isteğe bağlı hedef / `credit`); geçerli TR IBAN üretilir |
@@ -49,6 +50,10 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 - **Mobil** istemci token'ı `Authorization: Bearer` ile gönderir. **Web** istemci httpOnly + Secure +
   SameSite=Strict çerez kullanır; çerezli isteklerde `X-Requested-With` başlığı zorunludur (CSRF koruması).
 - Erişim token'ı 30 dakika geçerli; imza anahtarı `.env`'deki `JWT_SECRET` (en az 32 karakter, varsayılanı yok).
+- **Şifre değiştirme:** mevcut şifre doğrulanır; hatalı deneme, hatalı giriş sayacına eklenir (aynı 5 deneme /
+  15 dakika kilidi), böylece ele geçirilmiş bir oturumla şifre tahmin edilemez. Token'larda müşterinin
+  `session_version` değeri bulunur; şifre değişince artar ve önceki tüm token'lar (diğer cihazlar dahil)
+  geçersiz olur. İsteği yapan oturuma yeni token / çerez verilir.
 - Para tutarları `BigInteger` kuruş; negatif bakiye veritabanı kısıtıyla engellenir.
 - **Transfer:** müşteri satırı kilitlenir (aynı müşterinin transferleri sıraya girer), iki hesap id sırasıyla
   `FOR UPDATE` kilitlenir (karşılıklı transferde deadlock olmaz), bakiye kilitli satırdan okunur. Limitler:

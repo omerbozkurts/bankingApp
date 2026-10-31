@@ -50,6 +50,9 @@ export default function AuditLogScreen() {
       setNextBeforeId(page.nextBeforeId);
     } catch (e) {
       if (started === generation.current) handleError(e);
+    } finally {
+      // A refresh during the first load replaces it, so it also ends the first-load spinner.
+      if (started === generation.current) setLoading(false);
     }
   }, [handleError]);
 
@@ -57,15 +60,16 @@ export default function AuditLogScreen() {
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
+    const started = ++generation.current;
     adminFetchActions()
       .then(
         (page) => {
-          if (cancelled) return;
+          if (cancelled || started !== generation.current) return;
           setItems(page.items);
           setNextBeforeId(page.nextBeforeId);
         },
         (e) => {
-          if (!cancelled) handleError(e);
+          if (!cancelled && started === generation.current) handleError(e);
         },
       )
       .finally(() => {

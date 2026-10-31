@@ -27,8 +27,10 @@ export default function AdminScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The query the shown results belong to; answers for an older query are dropped.
-  const latest = useRef('');
+  // Bumped by every new search: answers to an older one are dropped, even for the same text
+  // (typing A, B, then A again must not let the first A answer last).
+  const search = useRef(0);
+  const term = useRef('');
   const busy = useRef(false);
 
   const handleError = useCallback((e: unknown) => {
@@ -39,26 +41,26 @@ export default function AdminScreen() {
   const isAdmin = session.status === 'signedIn' && session.customer.isAdmin;
   useEffect(() => {
     if (!isAdmin) return;
-    const term = query.trim();
-    latest.current = term;
+    const started = ++search.current;
+    term.current = query.trim();
     const timer = setTimeout(() => {
-      adminSearchCustomers(term)
+      adminSearchCustomers(term.current)
         .then(
           (page) => {
-            if (latest.current !== term) return;
+            if (started !== search.current) return;
             setError(null);
             setItems(page.items);
             setNextBeforeId(page.nextBeforeId);
           },
           (e) => {
-            if (latest.current !== term) return;
+            if (started !== search.current) return;
             setItems([]);
             setNextBeforeId(null);
             handleError(e);
           },
         )
         .finally(() => {
-          if (latest.current === term) setLoading(false);
+          if (started === search.current) setLoading(false);
         });
     }, SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
@@ -75,17 +77,17 @@ export default function AdminScreen() {
   if (!session.customer.isAdmin) return <Redirect href="/hesabim" />;
 
   async function loadMore() {
-    const term = latest.current;
+    const started = search.current;
     if (busy.current || loading || nextBeforeId === null) return;
     busy.current = true;
     setLoadingMore(true);
     try {
-      const page = await adminSearchCustomers(term, nextBeforeId);
-      if (latest.current !== term) return;
+      const page = await adminSearchCustomers(term.current, nextBeforeId);
+      if (started !== search.current) return;
       setItems((prev) => [...prev, ...page.items]);
       setNextBeforeId(page.nextBeforeId);
     } catch (e) {
-      handleError(e);
+      if (started === search.current) handleError(e);
     } finally {
       busy.current = false;
       setLoadingMore(false);

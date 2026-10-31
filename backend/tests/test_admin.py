@@ -304,7 +304,9 @@ async def test_freeze_racing_a_transfer_serialises_without_deadlock(client, bank
     ).json()
     assert detail["accounts"][0]["balance_kurus"] == 99_900
     assert detail["accounts"][0]["frozen"] is True
-    after = await client.post("/transfers", headers=bank["deniz"], json=transfer("3", 1, "after-freeze-1"))
+    after = await client.post(
+        "/transfers", headers=bank["deniz"], json=transfer("3", 1, "after-freeze-1")
+    )
     assert after.status_code == 400
 
 

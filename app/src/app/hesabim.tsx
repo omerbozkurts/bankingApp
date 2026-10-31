@@ -105,6 +105,11 @@ export default function AccountScreen() {
                 onPress={() => router.push('/aktar')}
               />
             ) : null}
+            <Button
+              title="Asistana sor"
+              variant="secondary"
+              onPress={() => router.push('/asistan')}
+            />
           </View>
 
           {refreshError ? (

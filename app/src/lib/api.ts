@@ -15,6 +15,7 @@ import {
   type Recipient,
   type TransferResult,
 } from './models';
+import type { ChatMessage } from './assistant';
 import { clearToken, getToken, setToken, usesBearerToken } from './token-store';
 
 const TIMEOUT_MS = 15_000;
@@ -33,7 +34,12 @@ const NETWORK_ERROR = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kon
 
 async function request<T>(
   path: string,
-  init: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -49,7 +55,7 @@ async function request<T>(
 
   // The timeout covers the whole exchange, including reading the body.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? TIMEOUT_MS);
   try {
     let response: Response;
     let data: unknown = null;
@@ -176,4 +182,15 @@ export async function createTransfer(input: {
     },
   });
   return toTransferResult(out);
+}
+
+/** The API keeps no conversation: the whole history goes with every message. */
+export async function askAssistant(messages: ChatMessage[]): Promise<string> {
+  const out = await request<{ reply: string }>('/assistant/chat', {
+    method: 'POST',
+    body: { messages },
+    // The model may read several accounts before answering.
+    timeoutMs: 90_000,
+  });
+  return out.reply;
 }

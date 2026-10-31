@@ -29,6 +29,7 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `GET` | `/accounts/{id}/transactions` | Hareketler, yeniden eskiye; `?limit=20&before_id=` ile sayfalama |
 | `GET` | `/recipients/lookup?iban=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
 | `POST` | `/transfers` | Para transferi; `idempotency_key` aynı isteğin iki kez ödenmesini engeller |
+| `POST` | `/assistant/chat` | Bankacılık asistanı (Claude): `{messages: [{role, content}]}` → `{reply}`; konuşma istemcide tutulur |
 | `GET` | `/health` | Uygulama ve veritabanı durumu |
 
 ## Güvenlik
@@ -53,6 +54,9 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 - **Kayıt:** T.C. kimlik no algoritmik olarak doğrulanır ve düz metin saklanmaz; `NATIONAL_ID_PEPPER` ile
   HMAC özeti tutulur (kişi başına tek kayıt). 18 yaş sınırı, kolay şifre engeli, IP başına saatte 5 kayıt.
 - Alıcı sorgusu müşteri başına 5 dakikada 30 ile sınırlı (maskeli isim toplanmasın diye).
+- **Asistan:** salt okunur; Claude yalnızca giriş yapmış müşterinin hesaplarını ve hareketlerini araçlarla
+  okur, para hareketi yapamaz (hareket açıklamalarına gömülü talimatlar bakiyeyi değiştiremez). Müşteri
+  başına 10 dakikada 20 mesaj. Anahtar: `.env`'de `ANTHROPIC_API_KEY` (veya `ant auth login`).
 
 ## Geliştirme
 

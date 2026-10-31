@@ -150,3 +150,32 @@ class TransferOut(BaseModel):
     description: str
     from_balance_after_kurus: int
     created_at: datetime
+
+
+class AssistantMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    # Assistant replies come back as history and may be longer than what a customer may type.
+    content: Annotated[str, Field(min_length=1, max_length=20_000), AfterValidator(str.strip)]
+
+    @model_validator(mode="after")
+    def user_message_length(self) -> AssistantMessage:
+        if self.role == "user" and len(self.content) > 2000:
+            raise ValueError("Mesaj en fazla 2000 karakter olabilir.")
+        return self
+
+
+class AssistantRequest(BaseModel):
+    # The client keeps the conversation and sends it whole; the API stores nothing.
+    messages: Annotated[list[AssistantMessage], Field(min_length=1, max_length=20)]
+
+    @model_validator(mode="after")
+    def ends_with_user(self) -> AssistantRequest:
+        if any(not m.content for m in self.messages):
+            raise ValueError("Mesaj boş olamaz.")
+        if self.messages[0].role != "user" or self.messages[-1].role != "user":
+            raise ValueError("Konuşma müşteri mesajıyla başlamalı ve bitmeli.")
+        return self
+
+
+class AssistantReply(BaseModel):
+    reply: str

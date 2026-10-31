@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.deps import CSRF_HEADER, SESSION_MODE_HEADER, SessionDep
-from app.routers import accounts, auth, customers, transfers
+from app.routers import accounts, assistant, auth, customers, transfers
 
 app = FastAPI(title="AB Bank API", version="0.1.0")
 
@@ -23,6 +23,7 @@ app.include_router(auth.router)
 app.include_router(customers.router)
 app.include_router(accounts.router)
 app.include_router(transfers.router)
+app.include_router(assistant.router)
 
 
 @app.exception_handler(RequestValidationError)

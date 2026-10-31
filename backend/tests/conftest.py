@@ -20,6 +20,7 @@ from sqlalchemy import text  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Account, Base, Customer  # noqa: E402
+from app.routers.assistant import assistant_limiter  # noqa: E402
 from app.routers.auth import login_limiter, register_limiter  # noqa: E402
 from app.routers.transfers import lookup_limiter  # noqa: E402
 from app.security import hash_password  # noqa: E402
@@ -46,6 +47,7 @@ async def clean_tables() -> None:
     login_limiter.reset()
     register_limiter.reset()
     lookup_limiter.reset()
+    assistant_limiter.reset()
 
 
 @pytest.fixture

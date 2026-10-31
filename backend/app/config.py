@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,14 @@ class Settings(BaseSettings):
 
     # Interest-free revolving credit: every customer can open one credit account with this limit.
     credit_limit_kurus: int = 2_000_000  # 20.000 TL
+
+    # Banking assistant (Claude). Without a key the SDK falls back to ANTHROPIC_API_KEY or an
+    # `ant auth login` profile; with no credentials at all the endpoint answers 503.
+    anthropic_api_key: SecretStr | None = None
+    assistant_model: str = "claude-opus-5-5"
+    # Messages per customer: each one is a paid model call.
+    assistant_rate_limit: int = 20
+    assistant_rate_window_seconds: int = 600
 
 
 @lru_cache

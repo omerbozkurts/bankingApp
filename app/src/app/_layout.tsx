@@ -64,6 +64,7 @@ export default function RootLayout() {
         <Stack.Screen name="hesap/[id]" />
         <Stack.Screen name="gonder" />
         <Stack.Screen name="aktar" />
+        <Stack.Screen name="asistan" />
         <Stack.Screen name="hesap-ac" />
       </Stack>
     </ThemeProvider>

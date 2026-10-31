@@ -3,6 +3,7 @@ import {
   toAccount,
   toCustomer,
   toMovement,
+  toSavedRecipient,
   toTransferResult,
   type Account,
   type AccountKind,
@@ -14,6 +15,8 @@ import {
   type MovementPage,
   type Recipient,
   type RecipientTarget,
+  type SavedRecipient,
+  type ApiSavedRecipient,
   type TransferResult,
 } from './models';
 import {
@@ -219,6 +222,25 @@ export async function createTransfer(input: {
     },
   });
   return toTransferResult(out);
+}
+
+export async function fetchSavedRecipients(): Promise<SavedRecipient[]> {
+  const rows = await request<ApiSavedRecipient[]>('/recipients/saved');
+  return rows.map(toSavedRecipient);
+}
+
+/** The API checks the recipient like a lookup before saving it. */
+export async function saveRecipient(nickname: string, to: RecipientTarget): Promise<SavedRecipient> {
+  const body = 'iban' in to ? { iban: to.iban } : { customer_no: to.customerNo };
+  const out = await request<ApiSavedRecipient>('/recipients/saved', {
+    method: 'POST',
+    body: { nickname, ...body },
+  });
+  return toSavedRecipient(out);
+}
+
+export async function deleteSavedRecipient(id: number): Promise<void> {
+  await request<void>(`/recipients/saved/${id}`, { method: 'DELETE' });
 }
 
 /** The API keeps no conversation: the whole history goes with every message. */

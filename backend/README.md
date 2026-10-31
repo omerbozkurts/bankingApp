@@ -30,6 +30,9 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `POST` | `/accounts` | Yeni hesap (`checking` / `savings` + isteğe bağlı hedef / `credit`); geçerli TR IBAN üretilir |
 | `GET` | `/accounts/{id}/transactions` | Hareketler, yeniden eskiye; `?limit=20&before_id=` ile sayfalama |
 | `GET` | `/recipients/lookup?iban=` · `?customer_no=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
+| `GET` | `/recipients/saved` | Kayıtlı alıcılar (takma ada göre sıralı) |
+| `POST` | `/recipients/saved` | `{nickname, iban \| customer_no}`: alıcıyı sorgu gibi doğrulayıp kaydeder (en fazla 50) |
+| `DELETE` | `/recipients/saved/{id}` | Kayıtlı alıcıyı siler |
 | `POST` | `/transfers` | Para transferi: `to_iban` veya `to_customer_no`; `idempotency_key` aynı isteğin iki kez ödenmesini engeller |
 | `POST` | `/assistant/chat` | Bankacılık asistanı (Claude): `{messages: [{role, content}]}` → `{reply}`; konuşma istemcide tutulur |
 | `GET` | `/admin/customers?q=` | Yönetici: müşteri arama (numara başı veya ad), sayfalı |
@@ -70,6 +73,9 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
   ve transfer yanıtında IBAN maskeli döner (`TR12******************0003`); müşteri numarası, arkasındaki
   hesabı açığa çıkarmaz. Limitler ve diğer kurallar IBAN ile gönderimle aynıdır. Numarayla yeni transferler
   alıcı sorgusuyla aynı kotayı kullanır, böylece transfer ucu müşteri numarası taramak için kullanılamaz.
+- **Kayıtlı alıcılar:** kaydetme, alıcı sorgusuyla aynı doğrulamayı ve kotayı kullanır (kayıt ucu da tarama
+  için kullanılamaz). Müşteri numarasıyla kaydedilen alıcının IBAN'ı saklanmaz; yalnızca kaydedildiği andaki
+  maskeli ad tutulur. Her müşteri yalnızca kendi listesini görür ve siler.
 - **Asistan:** salt okunur; Claude yalnızca giriş yapmış müşterinin hesaplarını ve hareketlerini araçlarla
   okur, para hareketi yapamaz (hareket açıklamalarına gömülü talimatlar bakiyeyi değiştiremez). Müşteri
   başına 10 dakikada 20 mesaj. Anahtar: `.env`'de `ANTHROPIC_API_KEY` (veya `ant auth login`).

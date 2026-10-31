@@ -8,7 +8,10 @@ import {
   availableKurus,
   debtKurus,
   paymentAccount,
+  sameTarget,
+  savedTarget,
   toCustomer,
+  toSavedRecipient,
   toMovement,
   toTransferResult,
   totalBalance,
@@ -78,4 +81,16 @@ test('paymentAccount en küçük id\'li vadesiz hesabı seçer', () => {
   const customer = toCustomer(me, [credit, later, accounts[1], accounts[0]]);
   assert.equal(paymentAccount(customer)?.id, 1);
   assert.equal(paymentAccount(toCustomer(me, [accounts[1], credit])), undefined);
+});
+
+test('savedTarget ve sameTarget kayıtlı alıcıyı transfer hedefine çevirir', () => {
+  const byNumber = toSavedRecipient({
+    id: 1, nickname: 'Ali', iban: null, customer_no: '987654321', masked_name: 'Al*** Ka***',
+  });
+  assert.deepEqual(savedTarget(byNumber), { customerNo: '987654321' });
+  const byIban = { ...byNumber, iban: 'TR01', customerNo: null };
+  assert.deepEqual(savedTarget(byIban), { iban: 'TR01' });
+  assert.equal(sameTarget({ iban: 'TR01' }, { iban: 'TR01' }), true);
+  assert.equal(sameTarget({ iban: 'TR01' }, { customerNo: 'TR01' }), false);
+  assert.equal(sameTarget({ customerNo: '1' }, { customerNo: '2' }), false);
 });

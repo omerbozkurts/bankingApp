@@ -72,6 +72,13 @@ async def lookup_recipient(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Alıcı için IBAN veya müşteri numarası girin (yalnızca birini).",
         )
+    return await describe_recipient(session, customer, iban, customer_no)
+
+
+async def describe_recipient(
+    session: SessionDep, customer: Customer, iban: str | None, customer_no: str | None
+) -> RecipientOut:
+    """Resolves exactly one of `iban` / `customer_no` like a lookup, under the lookup quota."""
     _check_lookup_limit(customer)
     if customer_no is not None:
         account, owner = await _customer_account(session, customer_no)

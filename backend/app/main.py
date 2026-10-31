@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.deps import CSRF_HEADER, SESSION_MODE_HEADER, SessionDep
-from app.routers import accounts, admin, assistant, auth, customers, transfers
+from app.routers import accounts, admin, assistant, auth, customers, recipients, transfers
 
 app = FastAPI(title="AB Bank API", version="0.1.0")
 
@@ -15,7 +15,7 @@ app.add_middleware(
     allow_origins=get_settings().cors_origins,
     # Needed for the web session cookie; safe because origins are an explicit allow-list.
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type", CSRF_HEADER, SESSION_MODE_HEADER],
 )
 
@@ -23,6 +23,7 @@ app.include_router(auth.router)
 app.include_router(customers.router)
 app.include_router(accounts.router)
 app.include_router(transfers.router)
+app.include_router(recipients.router)
 app.include_router(assistant.router)
 app.include_router(admin.router)
 

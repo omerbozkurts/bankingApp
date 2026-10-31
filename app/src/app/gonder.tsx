@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,9 +14,23 @@ import { Summary } from '@/components/ui/summary';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, createTransfer, lookupRecipient } from '@/lib/api';
+import {
+  ApiError,
+  createTransfer,
+  fetchSavedRecipients,
+  lookupRecipient,
+  saveRecipient,
+} from '@/lib/api';
 import { formatIban, isValidTrIban, normalizeIban } from '@/lib/banking';
-import { debtKurus, paymentAccount, type RecipientTarget, type TransferResult } from '@/lib/models';
+import {
+  debtKurus,
+  paymentAccount,
+  sameTarget,
+  savedTarget,
+  type RecipientTarget,
+  type SavedRecipient,
+  type TransferResult,
+} from '@/lib/models';
 import { formatKurus, parseTryAmount } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
 import { digitsOnly } from '@/lib/validation';
@@ -58,6 +72,11 @@ export default function TransferScreen() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TransferResult | null>(null);
+  const [saved, setSaved] = useState<SavedRecipient[]>([]);
+  const [saveName, setSaveName] = useState('');
+  const [saveState, setSaveState] = useState<
+    { status: 'idle' | 'saving' | 'saved' } | { status: 'error'; message: string }
+  >({ status: 'idle' });
 
   // One key per confirmed transfer: a retry after a dropped connection reuses it, so the API
   // returns the original transfer instead of sending the money twice.
@@ -66,6 +85,33 @@ export default function TransferScreen() {
   const keyFor = useRef<string | null>(null);
   // Ignores lookup answers for a recipient the user has since changed.
   const latestLookup = useRef('');
+
+  // Bumped by "Yeni transfer": a save still running for the finished transfer must not mark the
+  // next one's recipient as saved.
+  const transferRun = useRef(0);
+  // Bumped by every list load and every save: a load that started before a save would drop the
+  // newly saved row, so only the newest change may replace the list.
+  const listVersion = useRef(0);
+
+  // Reloaded whenever the screen comes back into view, e.g. after managing the list.
+  const signedIn = session.status === 'signedIn';
+  useFocusEffect(
+    useCallback(() => {
+      if (!signedIn) return;
+      let cancelled = false;
+      const started = ++listVersion.current;
+      // The list is a shortcut: if it can't load, the form still works without it.
+      fetchSavedRecipients().then(
+        (rows) => {
+          if (!cancelled && started === listVersion.current) setSaved(rows);
+        },
+        () => {},
+      );
+      return () => {
+        cancelled = true;
+      };
+    }, [signedIn]),
+  );
 
   if (session.status === 'unknown') {
     return (
@@ -97,6 +143,47 @@ export default function TransferScreen() {
     mode === 'iban'
       ? from?.iban === iban
       : ownTarget && paymentAccount(session.customer)?.id === from?.id;
+
+  const savedMatch = saved.find((r) => sameTarget(savedTarget(r), target));
+
+  function pickSaved(id: number) {
+    const picked = saved.find((r) => r.id === id);
+    if (!picked) return;
+    setErrors((e) => ({ ...e, recipient: undefined }));
+    if (picked.iban !== null) {
+      setMode('iban');
+      onIbanChange(picked.iban);
+    } else {
+      setMode('customerNo');
+      onCustomerNoChange(picked.customerNo ?? '');
+    }
+  }
+
+  async function saveCurrent() {
+    const nickname = saveName.trim();
+    if (saveState.status === 'saving') return;
+    if (!nickname) {
+      setSaveState({ status: 'error', message: 'Alıcıya bir ad verin.' });
+      return;
+    }
+    const run = transferRun.current;
+    setSaveState({ status: 'saving' });
+    try {
+      const row = await saveRecipient(nickname, target);
+      listVersion.current++;
+      // Saved either way, so the list gains it even if the user has moved on.
+      setSaved((rows) => [...rows, row]);
+      if (run !== transferRun.current) return;
+      setSaveState({ status: 'saved' });
+      AccessibilityInfo.announceForAccessibility(`${nickname} kayıtlı alıcılara eklendi.`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return void signOut();
+      if (run !== transferRun.current) return;
+      const message = e instanceof ApiError ? e.message : 'Alıcı kaydedilemedi.';
+      setSaveState({ status: 'error', message });
+      AccessibilityInfo.announceForAccessibility(message);
+    }
+  }
 
   // Each recipient is identified by a key, so an answer for an earlier input is dropped.
   const lookupKey = (to: RecipientTarget) => ('iban' in to ? `iban:${to.iban}` : `no:${to.customerNo}`);
@@ -252,6 +339,33 @@ export default function TransferScreen() {
             ['Hesabınızdaki yeni bakiye', formatKurus(result.fromBalanceAfterKurus)],
           ]}
         />
+        {saveState.status === 'saved' ? (
+          <Notice tone="info">
+            <ThemedText type="small">Alıcı kaydedildi. Bir dahaki sefere listeden seçebilirsiniz.</ThemedText>
+          </Notice>
+        ) : !ownTarget && !savedMatch ? (
+          <View style={styles.field}>
+            <TextField
+              label="Bu alıcıyı kaydet (isteğe bağlı)"
+              placeholder="Örn. Ev sahibi"
+              value={saveName}
+              onChangeText={(v) => {
+                setSaveName(v);
+                if (saveState.status === 'error') setSaveState({ status: 'idle' });
+              }}
+              maxLength={40}
+              returnKeyType="done"
+              onSubmitEditing={saveCurrent}
+              error={saveState.status === 'error' ? saveState.message : undefined}
+            />
+            <Button
+              title="Alıcıyı kaydet"
+              variant="secondary"
+              loading={saveState.status === 'saving'}
+              onPress={saveCurrent}
+            />
+          </View>
+        ) : null}
         <View style={styles.actions}>
           <Button title="Hesabıma dön" onPress={() => router.replace('/hesabim')} />
           <Button
@@ -260,6 +374,7 @@ export default function TransferScreen() {
             onPress={() => {
               // A new transfer, even with identical details, must not replay the finished one.
               idempotencyKey.current = null;
+              transferRun.current++;
               setStep('form');
               setResult(null);
               setIbanInput('TR');
@@ -267,6 +382,8 @@ export default function TransferScreen() {
               setRecipient({ status: 'idle' });
               setAmountInput('');
               setDescription('');
+              setSaveName('');
+              setSaveState({ status: 'idle' });
             }}
           />
         </View>
@@ -344,6 +461,30 @@ export default function TransferScreen() {
           <ThemedText type="small" themeColor="danger">
             {errors.from}
           </ThemedText>
+        ) : null}
+
+        {saved.length > 0 ? (
+          <View style={styles.field}>
+            <ChoiceList
+              label="Kayıtlı alıcılar"
+              value={savedMatch?.id ?? null}
+              onChange={pickSaved}
+              choices={saved.map((r) => ({
+                value: r.id,
+                title: r.nickname,
+                detail: `${r.maskedName} · ${
+                  r.iban !== null ? formatIban(r.iban) : `Müşteri no ${r.customerNo}`
+                }`,
+              }))}
+            />
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={12}
+              style={styles.link}
+              onPress={() => router.push('/alicilar')}>
+              <ThemedText type="label">Kayıtlı alıcıları yönet</ThemedText>
+            </Pressable>
+          </View>
         ) : null}
 
         <ChoiceList label="Alıcı" value={mode} onChange={changeMode} choices={MODES} />
@@ -439,5 +580,9 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.three,
+  },
+  link: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.one,
   },
 });

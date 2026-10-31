@@ -174,3 +174,26 @@ class AdminAction(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class SavedRecipient(Base):
+    """A recipient the customer saved under a nickname: an IBAN or a customer number."""
+
+    __tablename__ = "saved_recipients"
+    __table_args__ = (
+        CheckConstraint("(iban IS NULL) <> (customer_no IS NULL)", name="one_target"),
+        # NULLs are distinct, so these only bite for the column that is set.
+        UniqueConstraint("customer_id", "iban", name="uq_saved_recipients_iban"),
+        UniqueConstraint("customer_id", "customer_no", name="uq_saved_recipients_customer_no"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    nickname: Mapped[str] = mapped_column(String(40))
+    iban: Mapped[str | None] = mapped_column(String(34))
+    customer_no: Mapped[str | None] = mapped_column(String(9))
+    # As the lookup showed it when saved; for a customer number the IBAN is never stored.
+    masked_name: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

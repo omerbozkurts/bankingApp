@@ -249,3 +249,28 @@ class AdminActionOut(BaseModel):
 class AdminActionPage(BaseModel):
     items: list[AdminActionOut]
     next_before_id: int | None
+
+
+class SaveRecipientRequest(BaseModel):
+    nickname: Annotated[str, Field(max_length=40), AfterValidator(str.strip)]
+    iban: Iban | None = None
+    customer_no: CustomerNo | None = None
+
+    @model_validator(mode="after")
+    def valid(self) -> SaveRecipientRequest:
+        if not self.nickname:
+            raise ValueError("Alıcıya bir ad verin.")
+        if (self.iban is None) == (self.customer_no is None):
+            raise ValueError("Alıcı için IBAN veya müşteri numarası girin (yalnızca birini).")
+        return self
+
+
+class SavedRecipientOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nickname: str
+    # Exactly one is set.
+    iban: str | None
+    customer_no: str | None
+    masked_name: str

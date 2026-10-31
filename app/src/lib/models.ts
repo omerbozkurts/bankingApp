@@ -39,6 +39,44 @@ export type Recipient = { iban: string; maskedName: string };
 /** Who a transfer goes to: an IBAN, or a customer number (paid into their checking account). */
 export type RecipientTarget = { iban: string } | { customerNo: string };
 
+/** A recipient saved under a nickname; exactly one of `iban` / `customerNo` is set. */
+export type SavedRecipient = {
+  id: number;
+  nickname: string;
+  iban: string | null;
+  customerNo: string | null;
+  maskedName: string;
+};
+
+export type ApiSavedRecipient = {
+  id: number;
+  nickname: string;
+  iban: string | null;
+  customer_no: string | null;
+  masked_name: string;
+};
+
+export function toSavedRecipient(r: ApiSavedRecipient): SavedRecipient {
+  return {
+    id: r.id,
+    nickname: r.nickname,
+    iban: r.iban,
+    customerNo: r.customer_no,
+    maskedName: r.masked_name,
+  };
+}
+
+/** Where a saved recipient points, in the form a transfer takes. */
+export function savedTarget(r: SavedRecipient): RecipientTarget {
+  return r.iban !== null ? { iban: r.iban } : { customerNo: r.customerNo ?? '' };
+}
+
+/** Whether two targets address the recipient the same way (same IBAN, or same number). */
+export function sameTarget(a: RecipientTarget, b: RecipientTarget): boolean {
+  if ('iban' in a) return 'iban' in b && a.iban === b.iban;
+  return 'customerNo' in b && a.customerNo === b.customerNo;
+}
+
 export type TransferResult = {
   id: number;
   fromAccountId: number;

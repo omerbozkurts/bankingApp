@@ -67,6 +67,7 @@ export default function RootLayout() {
         <Stack.Screen name="asistan" />
         <Stack.Screen name="hesap-ac" />
         <Stack.Screen name="sifre" />
+        <Stack.Screen name="alicilar" />
         <Stack.Screen name="yonetici/index" />
         <Stack.Screen name="yonetici/musteri/[id]" />
         <Stack.Screen name="yonetici/kayitlar" />

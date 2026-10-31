@@ -146,7 +146,7 @@ export default function OwnTransferScreen() {
     try {
       const done = await createTransfer({
         fromAccountId: from.id,
-        toIban: to.iban,
+        to: { iban: to.iban },
         amountKurus,
         description: description.trim(),
         idempotencyKey: idempotencyKey.current,

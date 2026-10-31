@@ -28,8 +28,8 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `GET` | `/accounts` | Müşterinin hesapları; tutarlar **kuruş** cinsinden tam sayı |
 | `POST` | `/accounts` | Yeni hesap (`checking` / `savings` + isteğe bağlı hedef / `credit`); geçerli TR IBAN üretilir |
 | `GET` | `/accounts/{id}/transactions` | Hareketler, yeniden eskiye; `?limit=20&before_id=` ile sayfalama |
-| `GET` | `/recipients/lookup?iban=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
-| `POST` | `/transfers` | Para transferi; `idempotency_key` aynı isteğin iki kez ödenmesini engeller |
+| `GET` | `/recipients/lookup?iban=` · `?customer_no=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
+| `POST` | `/transfers` | Para transferi: `to_iban` veya `to_customer_no`; `idempotency_key` aynı isteğin iki kez ödenmesini engeller |
 | `POST` | `/assistant/chat` | Bankacılık asistanı (Claude): `{messages: [{role, content}]}` → `{reply}`; konuşma istemcide tutulur |
 | `GET` | `/admin/customers?q=` | Yönetici: müşteri arama (numara başı veya ad), sayfalı |
 | `GET` | `/admin/customers/{id}` | Yönetici: müşteri, hesapları ve giriş kilidi durumu |
@@ -61,6 +61,10 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 - **Kayıt:** T.C. kimlik no algoritmik olarak doğrulanır ve düz metin saklanmaz; `NATIONAL_ID_PEPPER` ile
   HMAC özeti tutulur (kişi başına tek kayıt). 18 yaş sınırı, kolay şifre engeli, IP başına saatte 5 kayıt.
 - Alıcı sorgusu müşteri başına 5 dakikada 30 ile sınırlı (maskeli isim toplanmasın diye).
+- **Müşteri no ile gönderim:** para alıcının ilk vadesiz hesabına gider (vadesiz hesabı yoksa `404`). Sorgu
+  ve transfer yanıtında IBAN maskeli döner (`TR12******************0003`); müşteri numarası, arkasındaki
+  hesabı açığa çıkarmaz. Limitler ve diğer kurallar IBAN ile gönderimle aynıdır. Numarayla yeni transferler
+  alıcı sorgusuyla aynı kotayı kullanır, böylece transfer ucu müşteri numarası taramak için kullanılamaz.
 - **Asistan:** salt okunur; Claude yalnızca giriş yapmış müşterinin hesaplarını ve hareketlerini araçlarla
   okur, para hareketi yapamaz (hareket açıklamalarına gömülü talimatlar bakiyeyi değiştiremez). Müşteri
   başına 10 dakikada 20 mesaj. Anahtar: `.env`'de `ANTHROPIC_API_KEY` (veya `ant auth login`).

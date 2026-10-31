@@ -13,6 +13,7 @@ import {
   type Customer,
   type MovementPage,
   type Recipient,
+  type RecipientTarget,
   type TransferResult,
 } from './models';
 import {
@@ -175,16 +176,22 @@ export function fetchMovements(
   return movementPage(`/accounts/${accountId}/transactions`, beforeId, limit);
 }
 
-export async function lookupRecipient(iban: string): Promise<Recipient> {
+function recipientFields(to: RecipientTarget) {
+  return 'iban' in to ? { to_iban: to.iban } : { to_customer_no: to.customerNo };
+}
+
+export async function lookupRecipient(to: RecipientTarget): Promise<Recipient> {
+  const params: Record<string, string> =
+    'iban' in to ? { iban: to.iban } : { customer_no: to.customerNo };
   const out = await request<{ iban: string; masked_name: string }>(
-    `/recipients/lookup?${new URLSearchParams({ iban })}`,
+    `/recipients/lookup?${new URLSearchParams(params)}`,
   );
   return { iban: out.iban, maskedName: out.masked_name };
 }
 
 export async function createTransfer(input: {
   fromAccountId: number;
-  toIban: string;
+  to: RecipientTarget;
   amountKurus: number;
   description: string;
   idempotencyKey: string;
@@ -193,7 +200,7 @@ export async function createTransfer(input: {
     method: 'POST',
     body: {
       from_account_id: input.fromAccountId,
-      to_iban: input.toIban,
+      ...recipientFields(input.to),
       amount_kurus: input.amountKurus,
       description: input.description,
       idempotency_key: input.idempotencyKey,

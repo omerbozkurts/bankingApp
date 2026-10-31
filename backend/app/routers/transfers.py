@@ -4,13 +4,13 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from app.banking import mask_name, normalize_iban
+from app.banking import mask_iban, mask_name, normalize_iban
 from app.config import get_settings
 from app.deps import CurrentCustomer, SessionDep
 from app.models import Account, Customer, Transaction, Transfer
 from app.rate_limit import SlidingWindowLimiter
 from app.routers.accounts import get_owned_account
-from app.schemas import Iban, RecipientOut, TransferOut, TransferRequest
+from app.schemas import CustomerNo, Iban, RecipientOut, TransferOut, TransferRequest
 
 router = APIRouter(tags=["transfers"])
 
@@ -22,6 +22,13 @@ lookup_limiter = SlidingWindowLimiter(
 UNKNOWN_IBAN = (
     "Bu IBAN AB Bank'ta kayıtlı değil. Şimdilik yalnızca AB Bank hesaplarına gönderim yapılabilir."
 )
+UNKNOWN_CUSTOMER = "Bu müşteri numarasıyla para alabilecek bir AB Bank hesabı bulunamadı."
+TOO_MANY_LOOKUPS = "Çok fazla alıcı sorgusu yaptınız. Lütfen birkaç dakika sonra tekrar deneyin."
+
+
+def _check_lookup_limit(customer: Customer) -> None:
+    if not lookup_limiter.allow(str(customer.id)):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=TOO_MANY_LOOKUPS)
 
 
 async def _recipient_account(session: SessionDep, iban: str) -> Account:
@@ -31,16 +38,45 @@ async def _recipient_account(session: SessionDep, iban: str) -> Account:
     return account
 
 
+async def _customer_account(session: SessionDep, customer_no: str) -> tuple[Account, Customer]:
+    """Where money sent to a customer number goes: that customer's first checking account."""
+    row = (
+        await session.execute(
+            select(Account, Customer)
+            .join(Customer, Customer.id == Account.customer_id)
+            .where(Customer.customer_no == customer_no, Account.kind == "checking")
+            .order_by(Account.id)
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=UNKNOWN_CUSTOMER)
+    account, owner = row
+    return account, owner
+
+
 @router.get("/recipients/lookup")
 async def lookup_recipient(
-    iban: Annotated[Iban, Query()], customer: CurrentCustomer, session: SessionDep
+    customer: CurrentCustomer,
+    session: SessionDep,
+    iban: Annotated[Iban | None, Query()] = None,
+    customer_no: Annotated[CustomerNo | None, Query()] = None,
 ) -> RecipientOut:
-    """Masked owner name, so the sender can confirm the recipient before sending."""
-    if not lookup_limiter.allow(str(customer.id)):
+    """Masked owner name, so the sender can confirm the recipient before sending.
+
+    Give `iban` or `customer_no`. For a customer number the IBAN comes back masked: the number
+    only addresses the transfer and must not reveal the account behind it.
+    """
+    if (iban is None) == (customer_no is None):
         raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Çok fazla alıcı sorgusu yaptınız. Lütfen birkaç dakika sonra tekrar deneyin.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Alıcı için IBAN veya müşteri numarası girin (yalnızca birini).",
         )
+    _check_lookup_limit(customer)
+    if customer_no is not None:
+        account, owner = await _customer_account(session, customer_no)
+        return RecipientOut(iban=mask_iban(account.iban), masked_name=mask_name(owner.full_name))
+    assert iban is not None
     account = await _recipient_account(session, iban)
     # Someone else's credit account can't receive transfers, so don't reveal its owner either.
     if account.kind == "credit" and account.customer_id != customer.id:
@@ -54,7 +90,7 @@ def _description(body: TransferRequest, own: bool) -> str:
     return body.description or ("Hesaplar arası transfer" if own else "Para transferi")
 
 
-async def _transfer_out(session: SessionDep, transfer: Transfer) -> TransferOut:
+async def _transfer_out(session: SessionDep, transfer: Transfer, masked: bool) -> TransferOut:
     to_account = await session.get(Account, transfer.to_account_id)
     debit = await session.scalar(
         select(Transaction).where(
@@ -66,7 +102,7 @@ async def _transfer_out(session: SessionDep, transfer: Transfer) -> TransferOut:
     return TransferOut(
         id=transfer.id,
         from_account_id=transfer.from_account_id,
-        to_iban=to_account.iban,
+        to_iban=mask_iban(to_account.iban) if masked else to_account.iban,
         recipient=debit.counterparty or "",
         amount_kurus=transfer.amount_kurus,
         description=transfer.description,
@@ -105,22 +141,40 @@ async def create_transfer(
         # For own accounts a blank description matches either default: own transfers made before
         # own-account support stored "Para transferi", and a retry of one must still replay.
         descriptions = {_description(body, o) for o in ((True, False) if own else (False,))}
+        if to_account is None:
+            same_target = False
+        elif body.to_customer_no is not None:
+            # The account the number points to, not just any account of that customer.
+            try:
+                number_account, _ = await _customer_account(session, body.to_customer_no)
+            except HTTPException:
+                same_target = False
+            else:
+                same_target = number_account.id == to_account.id
+        else:
+            same_target = to_account.iban == body.to_iban
         same_request = (
-            to_account is not None
+            same_target
             and previous.from_account_id == body.from_account_id
             and previous.amount_kurus == body.amount_kurus
             and previous.description in descriptions
-            and to_account.iban == body.to_iban
         )
         if not same_request:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Bu işlem anahtarı farklı bir işlem için kullanıldı.",
             )
-        return await _transfer_out(session, previous)
+        return await _transfer_out(session, previous, masked=body.to_customer_no is not None)
 
     from_account = await get_owned_account(session, customer.id, body.from_account_id)
-    to_account = await _recipient_account(session, body.to_iban)
+    if body.to_customer_no is not None:
+        # Whether a 9-digit number is a customer shows in the answer (404 or not) even when no
+        # money moves, so new transfers by number share the lookup's quota.
+        _check_lookup_limit(customer)
+        to_account, _ = await _customer_account(session, body.to_customer_no)
+    else:
+        assert body.to_iban is not None
+        to_account = await _recipient_account(session, body.to_iban)
     # Matches the lookup: someone else's credit account doesn't exist as far as senders know.
     if to_account.kind == "credit" and to_account.customer_id != customer.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=UNKNOWN_IBAN)
@@ -235,4 +289,4 @@ async def create_transfer(
     )
     await session.commit()
     await session.refresh(transfer)
-    return await _transfer_out(session, transfer)
+    return await _transfer_out(session, transfer, masked=body.to_customer_no is not None)

@@ -70,6 +70,11 @@ def national_id_digest(national_id: str, pepper: str) -> str:
 MASKED_NAME_WORDS = 4
 
 
+def mask_iban(iban: str) -> str:
+    """Country code, check digits and the last 4 digits: TR12******************0003."""
+    return iban[:4] + "*" * (len(iban) - 8) + iban[-4:]
+
+
 def mask_name(full_name: str) -> str:
     """'Deniz Yılmaz' -> 'De*** Yı***': enough to confirm a recipient, not to identify them.
 

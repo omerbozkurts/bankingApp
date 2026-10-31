@@ -16,9 +16,10 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, createTransfer, lookupRecipient } from '@/lib/api';
 import { formatIban, isValidTrIban, normalizeIban } from '@/lib/banking';
-import { debtKurus, type TransferResult } from '@/lib/models';
+import { debtKurus, paymentAccount, type RecipientTarget, type TransferResult } from '@/lib/models';
 import { formatKurus, parseTryAmount } from '@/lib/money';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
+import { digitsOnly } from '@/lib/validation';
 
 // Mirrors the API's per-transfer cap (backend/app/config.py: transfer_max_kurus).
 const MAX_TRANSFER_KURUS = 5_000_000;
@@ -26,10 +27,19 @@ const MAX_TRANSFER_KURUS = 5_000_000;
 type Recipient =
   | { status: 'idle' }
   | { status: 'checking' }
-  | { status: 'found'; maskedName: string }
+  // `iban` is masked when the recipient was found by customer number.
+  | { status: 'found'; maskedName: string; iban: string }
   | { status: 'error'; message: string };
 
-type Errors = { iban?: string; amount?: string; description?: string; from?: string };
+type Errors = { recipient?: string; amount?: string; description?: string; from?: string };
+
+/** How the recipient is addressed. */
+type Mode = 'iban' | 'customerNo';
+
+const MODES: { value: Mode; title: string; detail: string }[] = [
+  { value: 'iban', title: 'IBAN ile', detail: 'Herhangi bir AB Bank hesabına' },
+  { value: 'customerNo', title: 'Müşteri no ile', detail: 'Alıcının vadesiz hesabına' },
+];
 
 export default function TransferScreen() {
   const theme = useTheme();
@@ -38,7 +48,9 @@ export default function TransferScreen() {
 
   const [step, setStep] = useState<'form' | 'confirm' | 'done'>('form');
   const [fromId, setFromId] = useState<number | null>(hesap ? Number(hesap) : null);
+  const [mode, setMode] = useState<Mode>('iban');
   const [ibanInput, setIbanInput] = useState('TR');
+  const [customerNoInput, setCustomerNoInput] = useState('');
   const [recipient, setRecipient] = useState<Recipient>({ status: 'idle' });
   const [amountInput, setAmountInput] = useState('');
   const [description, setDescription] = useState('');
@@ -52,7 +64,7 @@ export default function TransferScreen() {
   const idempotencyKey = useRef<string | null>(null);
   // What the current key was issued for: confirming the same transfer again reuses the key.
   const keyFor = useRef<string | null>(null);
-  // Ignores lookup answers for an IBAN the user has since changed.
+  // Ignores lookup answers for a recipient the user has since changed.
   const latestLookup = useRef('');
 
   if (session.status === 'unknown') {
@@ -70,35 +82,70 @@ export default function TransferScreen() {
   const senders = accounts.filter((a) => a.kind !== 'credit' && !a.frozen);
   const from = senders.find((a) => a.id === fromId) ?? senders[0];
   const iban = normalizeIban(ibanInput);
+  const target: RecipientTarget =
+    mode === 'iban' ? { iban } : { customerNo: customerNoInput };
   const amountKurus = parseTryAmount(amountInput);
   // Sending to one of the customer's own accounts: no cap, and the API names the account.
-  const ownTarget = accounts.some((a) => a.iban === iban);
-  const ownCredit = accounts.find((a) => a.iban === iban && a.kind === 'credit');
+  const ownTarget =
+    mode === 'iban'
+      ? accounts.some((a) => a.iban === iban)
+      : customerNoInput === session.customer.customerNo;
+  // Money sent to a customer number always lands in a checking account, never a credit one.
+  const ownCredit =
+    mode === 'iban' ? accounts.find((a) => a.iban === iban && a.kind === 'credit') : undefined;
+  const sameAccount =
+    mode === 'iban'
+      ? from?.iban === iban
+      : ownTarget && paymentAccount(session.customer)?.id === from?.id;
 
-  async function onIbanChange(text: string) {
+  // Each recipient is identified by a key, so an answer for an earlier input is dropped.
+  const lookupKey = (to: RecipientTarget) => ('iban' in to ? `iban:${to.iban}` : `no:${to.customerNo}`);
+
+  function changeMode(next: Mode) {
+    if (next === mode) return;
+    setMode(next);
+    setErrors((e) => ({ ...e, recipient: undefined }));
+    // The other field's recipient no longer applies; look it up again if it is complete.
+    if (next === 'iban') onIbanChange(ibanInput);
+    else onCustomerNoChange(customerNoInput);
+  }
+
+  function onIbanChange(text: string) {
     const cleaned = normalizeIban(text).replace(/[^A-Z0-9]/g, '').slice(0, 26);
     setIbanInput(formatIban(cleaned));
-    setErrors((e) => ({ ...e, iban: undefined }));
-    latestLookup.current = cleaned;
+    setErrors((e) => ({ ...e, recipient: undefined }));
+    latestLookup.current = lookupKey({ iban: cleaned });
 
-    if (cleaned.length < 26) {
-      setRecipient({ status: 'idle' });
-      return;
-    }
+    if (cleaned.length < 26) return setRecipient({ status: 'idle' });
     if (!isValidTrIban(cleaned)) {
       setRecipient({ status: 'error', message: 'IBAN hatalı görünüyor. Lütfen kontrol edin.' });
       return;
     }
+    lookup({ iban: cleaned });
+  }
+
+  function onCustomerNoChange(text: string) {
+    const cleaned = digitsOnly(text, 9);
+    setCustomerNoInput(cleaned);
+    setErrors((e) => ({ ...e, recipient: undefined }));
+    latestLookup.current = lookupKey({ customerNo: cleaned });
+
+    if (cleaned.length < 9) return setRecipient({ status: 'idle' });
+    lookup({ customerNo: cleaned });
+  }
+
+  async function lookup(to: RecipientTarget) {
+    const key = lookupKey(to);
     setRecipient({ status: 'checking' });
     try {
-      const found = await lookupRecipient(cleaned);
-      if (latestLookup.current === cleaned) {
-        setRecipient({ status: 'found', maskedName: found.maskedName });
+      const found = await lookupRecipient(to);
+      if (latestLookup.current === key) {
+        setRecipient({ status: 'found', maskedName: found.maskedName, iban: found.iban });
         AccessibilityInfo.announceForAccessibility(`Alıcı: ${found.maskedName}`);
       }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return void signOut();
-      if (latestLookup.current === cleaned) {
+      if (latestLookup.current === key) {
         setRecipient({
           status: 'error',
           message: e instanceof ApiError ? e.message : 'Alıcı bilgisi alınamadı.',
@@ -110,10 +157,13 @@ export default function TransferScreen() {
   function goToConfirm() {
     const next: Errors = {};
     if (!from) next.from = 'Gönderen hesabı seçin.';
-    if (!isValidTrIban(iban)) next.iban = 'Geçerli bir TR IBAN girin.';
-    else if (recipient.status === 'error') next.iban = recipient.message;
-    else if (recipient.status !== 'found') next.iban = 'Alıcı bilgisi doğrulanıyor, lütfen bekleyin.';
-    else if (from && iban === from.iban) next.iban = 'Aynı hesaba para gönderilemez.';
+    if (mode === 'iban' && !isValidTrIban(iban)) next.recipient = 'Geçerli bir TR IBAN girin.';
+    else if (mode === 'customerNo' && customerNoInput.length !== 9)
+      next.recipient = 'Müşteri numarası 9 haneli olmalı.';
+    else if (recipient.status === 'error') next.recipient = recipient.message;
+    else if (recipient.status !== 'found')
+      next.recipient = 'Alıcı bilgisi doğrulanıyor, lütfen bekleyin.';
+    else if (from && sameAccount) next.recipient = 'Aynı hesaba para gönderilemez.';
 
     if (!amountInput.trim()) next.amount = 'Tutarı girin.';
     else if (amountKurus === null) next.amount = 'Tutarı 1.250,50 biçiminde girin.';
@@ -137,7 +187,7 @@ export default function TransferScreen() {
     }
     // After an unclear failure the first attempt may have gone through; "Düzenle" without
     // changes must not turn the retry into a second payment.
-    const contents = JSON.stringify([from?.id, iban, amountKurus, description.trim()]);
+    const contents = JSON.stringify([from?.id, target, amountKurus, description.trim()]);
     if (!idempotencyKey.current || keyFor.current !== contents) {
       idempotencyKey.current = Crypto.randomUUID();
       keyFor.current = contents;
@@ -154,7 +204,7 @@ export default function TransferScreen() {
     try {
       const done = await createTransfer({
         fromAccountId: from.id,
-        toIban: iban,
+        to: target,
         amountKurus,
         description: description.trim(),
         idempotencyKey: idempotencyKey.current,
@@ -213,6 +263,7 @@ export default function TransferScreen() {
               setStep('form');
               setResult(null);
               setIbanInput('TR');
+              setCustomerNoInput('');
               setRecipient({ status: 'idle' });
               setAmountInput('');
               setDescription('');
@@ -235,7 +286,10 @@ export default function TransferScreen() {
           rows={[
             ['Tutar', formatKurus(amountKurus)],
             ['Alıcı', recipient.maskedName],
-            ['Alıcı IBAN', formatIban(iban)],
+            ...(mode === 'customerNo'
+              ? ([['Alıcı müşteri no', customerNoInput]] as [string, string][])
+              : []),
+            ['Alıcı IBAN', formatIban(recipient.iban)],
             ['Gönderen hesap', `${from.name} · ${formatKurus(from.balanceKurus)}`],
             [
               'Açıklama',
@@ -292,16 +346,35 @@ export default function TransferScreen() {
           </ThemedText>
         ) : null}
 
+        <ChoiceList label="Alıcı" value={mode} onChange={changeMode} choices={MODES} />
+
         <View style={styles.field}>
-          <TextField
-            label="Alıcı IBAN"
-            value={ibanInput}
-            onChangeText={onIbanChange}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            autoComplete="off"
-            error={errors.iban ?? (recipient.status === 'error' ? recipient.message : undefined)}
-          />
+          {mode === 'iban' ? (
+            <TextField
+              label="Alıcı IBAN"
+              value={ibanInput}
+              onChangeText={onIbanChange}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              error={
+                errors.recipient ?? (recipient.status === 'error' ? recipient.message : undefined)
+              }
+            />
+          ) : (
+            <TextField
+              label="Alıcı müşteri numarası"
+              placeholder="9 haneli numara"
+              value={customerNoInput}
+              onChangeText={onCustomerNoChange}
+              keyboardType="number-pad"
+              autoComplete="off"
+              maxLength={9}
+              error={
+                errors.recipient ?? (recipient.status === 'error' ? recipient.message : undefined)
+              }
+            />
+          )}
           {recipient.status === 'checking' ? (
             <ThemedText type="small" themeColor="textSecondary">
               Alıcı doğrulanıyor…
@@ -309,6 +382,7 @@ export default function TransferScreen() {
           ) : recipient.status === 'found' ? (
             <ThemedText type="small" accessibilityLiveRegion="polite">
               Alıcı: <ThemedText type="smallBold">{recipient.maskedName}</ThemedText>
+              {mode === 'customerNo' ? ` · ${formatIban(recipient.iban)}` : ''}
             </ThemedText>
           ) : null}
         </View>

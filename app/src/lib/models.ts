@@ -33,7 +33,11 @@ export type Movement = {
 
 export type MovementPage = { items: Movement[]; nextBeforeId: number | null };
 
+/** IBAN, or masked (TR12…0003) when looked up by customer number. */
 export type Recipient = { iban: string; maskedName: string };
+
+/** Who a transfer goes to: an IBAN, or a customer number (paid into their checking account). */
+export type RecipientTarget = { iban: string } | { customerNo: string };
 
 export type TransferResult = {
   id: number;
@@ -133,6 +137,13 @@ export function totalBalance(customer: Customer): number {
 /** What can be sent from the account: the balance, plus the limit for a credit account. */
 export function availableKurus(account: Account): number {
   return account.balanceKurus + (account.creditLimitKurus ?? 0);
+}
+
+/** The account money sent to this customer's number lands in: their first checking account. */
+export function paymentAccount(customer: Customer): Account | undefined {
+  return customer.accounts
+    .filter((a) => a.kind === 'checking')
+    .reduce<Account | undefined>((first, a) => (first && first.id < a.id ? first : a), undefined);
 }
 
 /** Amount owed on a credit account; 0 for other accounts. */

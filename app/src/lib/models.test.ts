@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   availableKurus,
   debtKurus,
+  paymentAccount,
   toCustomer,
   toMovement,
   toTransferResult,
@@ -70,4 +71,11 @@ test('debtKurus yalnızca kredili hesapta borcu verir', () => {
   const [checking, , creditAccount] = toCustomer(me, [...accounts, credit]).accounts;
   assert.equal(debtKurus(creditAccount), 500_000);
   assert.equal(debtKurus(checking), 0);
+});
+
+test('paymentAccount en küçük id\'li vadesiz hesabı seçer', () => {
+  const later = { ...accounts[0], id: 9, iban: 'TR09' };
+  const customer = toCustomer(me, [credit, later, accounts[1], accounts[0]]);
+  assert.equal(paymentAccount(customer)?.id, 1);
+  assert.equal(paymentAccount(toCustomer(me, [accounts[1], credit])), undefined);
 });

@@ -61,3 +61,15 @@ async def get_current_customer(
 
 
 CurrentCustomer = Annotated[Customer, Depends(get_current_customer)]
+
+
+async def get_current_admin(customer: CurrentCustomer) -> Customer:
+    # Read from the database on every request, so revoking the flag takes effect at once.
+    if not customer.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Bu işlem için yetkiniz yok."
+        )
+    return customer
+
+
+CurrentAdmin = Annotated[Customer, Depends(get_current_admin)]

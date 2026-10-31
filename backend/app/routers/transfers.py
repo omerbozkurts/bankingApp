@@ -172,6 +172,12 @@ async def create_transfer(
         )
     }
     source, target = locked[from_account.id], locked[to_account.id]
+    # Checked under the lock: a freeze takes the same row lock, so it can't slip in between.
+    if source.frozen:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bu hesap dondurulmuş; hesaptan para çıkışı yapılamaz. Bankanızla görüşün.",
+        )
     # Credit accounts only move money between the owner's accounts: draw to, repay from.
     if not own and "credit" in (source.kind, target.kind):
         raise HTTPException(

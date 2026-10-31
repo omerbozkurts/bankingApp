@@ -39,7 +39,7 @@ npx expo export --platform web   # statik web çıktısı → dist/
 
 | Yol | İçerik |
 |---|---|
-| `src/app/` | Ekranlar (Expo Router): `index` karşılama, `kayit` hesap açma, `giris`, `hesabim`, `hesap/[id]` hareketler, `gonder` para transferi, `aktar` hesaplarım arası, `hesap-ac` yeni hesap, `asistan` bankacılık asistanı |
+| `src/app/` | Ekranlar (Expo Router): `index` karşılama, `kayit` hesap açma, `giris`, `hesabim`, `hesap/[id]` hareketler, `gonder` para transferi, `aktar` hesaplarım arası, `hesap-ac` yeni hesap, `asistan` bankacılık asistanı, `yonetici/` yönetici paneli (müşteri arama, `musteri/[id]`, `kayitlar`) |
 | `src/components/brand/` | `Logo` bileşeni (sembol / yatay / dikey); yazı izleri `logo/brand` ana dosyasından |
 | `src/components/ui/` | `Screen`, `ScreenHeader`, `Button`, `TextField`, `ChoiceList`, `Notice`, `Summary` |
 | `src/constants/theme.ts` | Marka renkleri, Manrope font adları, boşluk ve yarıçap ölçüleri |

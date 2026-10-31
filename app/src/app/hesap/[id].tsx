@@ -129,7 +129,15 @@ export default function AccountDetailScreen() {
           {formatIban(account.iban)}
         </ThemedText>
       </View>
-      {account.kind === 'credit' ? (
+      {account.frozen ? (
+        <Notice tone="error">
+          <ThemedText type="smallBold">Bu hesap dondurulmuş</ThemedText>
+          <ThemedText type="small">
+            Hesaptan para çıkışı yapılamaz; gelen ödemeler hesaba geçmeye devam eder. Bilgi için
+            bankanızla görüşün.
+          </ThemedText>
+        </Notice>
+      ) : account.kind === 'credit' ? (
         <Button
           title="Hesaplarıma aktar"
           onPress={() => router.push({ pathname: '/aktar', params: { hesap: String(account.id) } })}

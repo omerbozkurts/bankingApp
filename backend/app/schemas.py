@@ -76,6 +76,7 @@ class CustomerOut(BaseModel):
 
     customer_no: str
     full_name: str
+    is_admin: bool
 
 
 class AccountOut(BaseModel):
@@ -89,6 +90,7 @@ class AccountOut(BaseModel):
     balance_kurus: int
     goal_kurus: int | None
     credit_limit_kurus: int | None
+    frozen: bool
 
 
 class OpenAccountRequest(BaseModel):
@@ -179,3 +181,52 @@ class AssistantRequest(BaseModel):
 
 class AssistantReply(BaseModel):
     reply: str
+
+
+class AdminCustomerOut(BaseModel):
+    id: int
+    customer_no: str
+    full_name: str
+    is_admin: bool
+    # Temporarily locked after repeated wrong passwords.
+    locked: bool
+    account_count: int
+    created_at: datetime
+
+
+class AdminCustomerPage(BaseModel):
+    items: list[AdminCustomerOut]
+    next_before_id: int | None
+
+
+class AdminCustomerDetail(AdminCustomerOut):
+    accounts: list[AccountOut]
+
+
+class AdminActionRequest(BaseModel):
+    # Every change is logged with a reason someone can read later.
+    reason: Annotated[str, Field(max_length=200), AfterValidator(str.strip)]
+
+    @model_validator(mode="after")
+    def reason_given(self) -> AdminActionRequest:
+        if len(self.reason) < 3:
+            raise ValueError("Bir açıklama yazın (en az 3 karakter).")
+        return self
+
+
+class AdminActionOut(BaseModel):
+    id: int
+    action: Literal[
+        "freeze_account", "unfreeze_account", "unlock_customer", "grant_admin", "revoke_admin"
+    ]
+    # Null when the change was made on the server (granting or revoking admin rights).
+    admin_customer_no: str | None
+    customer_no: str
+    account_id: int | None
+    reason: str
+    created_at: datetime
+
+
+class AdminActionPage(BaseModel):
+    items: list[AdminActionOut]
+    next_before_id: int | None

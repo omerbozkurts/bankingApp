@@ -15,6 +15,16 @@ import {
   type Recipient,
   type TransferResult,
 } from './models';
+import {
+  toAdminAction,
+  toAdminCustomer,
+  type AdminActionPage,
+  type AdminCustomer,
+  type AdminCustomerDetail,
+  type AdminCustomerPage,
+  type ApiAdminAction,
+  type ApiAdminCustomer,
+} from './admin';
 import type { ChatMessage } from './assistant';
 import { clearToken, getToken, setToken, usesBearerToken } from './token-store';
 
@@ -144,17 +154,25 @@ export async function openAccount(input: {
   return toAccount(account);
 }
 
-export async function fetchMovements(
+function pageParams(beforeId: number | null, limit: number, extra: Record<string, string> = {}) {
+  const params = new URLSearchParams({ ...extra, limit: String(limit) });
+  if (beforeId !== null) params.set('before_id', String(beforeId));
+  return params;
+}
+
+async function movementPage(path: string, beforeId: number | null, limit: number) {
+  const page = await request<{ items: ApiTransaction[]; next_before_id: number | null }>(
+    `${path}?${pageParams(beforeId, limit)}`,
+  );
+  return { items: page.items.map(toMovement), nextBeforeId: page.next_before_id };
+}
+
+export function fetchMovements(
   accountId: number,
   beforeId: number | null = null,
   limit = 20,
 ): Promise<MovementPage> {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (beforeId !== null) params.set('before_id', String(beforeId));
-  const page = await request<{ items: ApiTransaction[]; next_before_id: number | null }>(
-    `/accounts/${accountId}/transactions?${params}`,
-  );
-  return { items: page.items.map(toMovement), nextBeforeId: page.next_before_id };
+  return movementPage(`/accounts/${accountId}/transactions`, beforeId, limit);
 }
 
 export async function lookupRecipient(iban: string): Promise<Recipient> {
@@ -193,4 +211,61 @@ export async function askAssistant(messages: ChatMessage[]): Promise<string> {
     timeoutMs: 90_000,
   });
   return out.reply;
+}
+
+// Admin panel. Every endpoint answers 403 unless the signed-in customer is an admin.
+
+export async function adminSearchCustomers(
+  query: string,
+  beforeId: number | null = null,
+  limit = 20,
+): Promise<AdminCustomerPage> {
+  const page = await request<{ items: ApiAdminCustomer[]; next_before_id: number | null }>(
+    `/admin/customers?${pageParams(beforeId, limit, { q: query })}`,
+  );
+  return { items: page.items.map(toAdminCustomer), nextBeforeId: page.next_before_id };
+}
+
+export async function adminFetchCustomer(id: number): Promise<AdminCustomerDetail> {
+  const out = await request<ApiAdminCustomer & { accounts: ApiAccount[] }>(`/admin/customers/${id}`);
+  return { ...toAdminCustomer(out), accounts: out.accounts.map(toAccount) };
+}
+
+export function adminFetchMovements(
+  accountId: number,
+  beforeId: number | null = null,
+  limit = 20,
+): Promise<MovementPage> {
+  return movementPage(`/admin/accounts/${accountId}/transactions`, beforeId, limit);
+}
+
+/** Freezes or unfreezes an account; the reason goes into the audit log. */
+export async function adminSetFrozen(
+  accountId: number,
+  frozen: boolean,
+  reason: string,
+): Promise<Account> {
+  const out = await request<ApiAccount>(
+    `/admin/accounts/${accountId}/${frozen ? 'freeze' : 'unfreeze'}`,
+    { method: 'POST', body: { reason } },
+  );
+  return toAccount(out);
+}
+
+export async function adminUnlockCustomer(id: number, reason: string): Promise<AdminCustomer> {
+  const out = await request<ApiAdminCustomer>(`/admin/customers/${id}/unlock`, {
+    method: 'POST',
+    body: { reason },
+  });
+  return toAdminCustomer(out);
+}
+
+export async function adminFetchActions(
+  beforeId: number | null = null,
+  limit = 20,
+): Promise<AdminActionPage> {
+  const page = await request<{ items: ApiAdminAction[]; next_before_id: number | null }>(
+    `/admin/actions?${pageParams(beforeId, limit)}`,
+  );
+  return { items: page.items.map(toAdminAction), nextBeforeId: page.next_before_id };
 }

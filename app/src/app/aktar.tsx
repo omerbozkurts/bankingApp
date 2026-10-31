@@ -79,7 +79,9 @@ export default function OwnTransferScreen() {
   if (session.status === 'signedOut') return <Redirect href="/giris" />;
 
   const accounts = session.customer.accounts;
-  const from = accounts.find((a) => a.id === fromId) ?? accounts[0];
+  // Nothing leaves a frozen account, but it can still receive.
+  const sources = accounts.filter((a) => !a.frozen);
+  const from = sources.find((a) => a.id === fromId) ?? sources[0];
   // The target can never be the source: picking the target's account as source moves it on.
   const targets = accounts.filter((a) => a.id !== from?.id);
   const to = targets.find((a) => a.id === toId) ?? targets[0];
@@ -92,10 +94,14 @@ export default function OwnTransferScreen() {
         <View style={styles.copy}>
           <ThemedText type="title">Hesaplarım arası</ThemedText>
           <ThemedText themeColor="textSecondary">
-            Hesaplarınız arasında para aktarmak için en az iki hesabınız olmalı.
+            {accounts.length >= 2
+              ? 'Hesaplarınız dondurulmuş; şu anda hiçbirinden para aktarılamaz.'
+              : 'Hesaplarınız arasında para aktarmak için en az iki hesabınız olmalı.'}
           </ThemedText>
         </View>
-        <Button title="Yeni hesap aç" onPress={() => router.replace('/hesap-ac')} />
+        {accounts.length < 2 ? (
+          <Button title="Yeni hesap aç" onPress={() => router.replace('/hesap-ac')} />
+        ) : null}
       </Screen>
     );
   }
@@ -260,7 +266,7 @@ export default function OwnTransferScreen() {
           label="Gönderen hesap"
           value={from.id}
           onChange={setFromId}
-          choices={accounts.map((a) => ({
+          choices={sources.map((a) => ({
             value: a.id,
             title: a.name,
             detail: accountDetail(a),

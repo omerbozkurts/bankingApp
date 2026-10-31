@@ -65,8 +65,9 @@ export default function TransferScreen() {
   if (session.status === 'signedOut') return <Redirect href="/giris" />;
 
   const accounts = session.customer.accounts;
-  // A credit account only moves money between the customer's own accounts (see aktar.tsx).
-  const senders = accounts.filter((a) => a.kind !== 'credit');
+  // A credit account only moves money between the customer's own accounts (see aktar.tsx), and
+  // nothing leaves a frozen account.
+  const senders = accounts.filter((a) => a.kind !== 'credit' && !a.frozen);
   const from = senders.find((a) => a.id === fromId) ?? senders[0];
   const iban = normalizeIban(ibanInput);
   const amountKurus = parseTryAmount(amountInput);

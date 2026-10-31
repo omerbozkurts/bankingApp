@@ -13,19 +13,20 @@ import {
   totalBalance,
 } from './models.ts';
 
-const me = { customer_no: '123456789', full_name: 'Deniz Yılmaz' };
+const me = { customer_no: '123456789', full_name: 'Deniz Yılmaz', is_admin: false };
 const accounts = [
-  { id: 1, kind: 'checking' as const, name: 'Vadesiz', iban: 'TR01', balance_kurus: 1_245_075, goal_kurus: null, credit_limit_kurus: null },
-  { id: 2, kind: 'savings' as const, name: 'Birikim', iban: 'TR02', balance_kurus: 3_820_000, goal_kurus: 5_000_000, credit_limit_kurus: null },
+  { id: 1, kind: 'checking' as const, name: 'Vadesiz', iban: 'TR01', balance_kurus: 1_245_075, goal_kurus: null, credit_limit_kurus: null, frozen: false },
+  { id: 2, kind: 'savings' as const, name: 'Birikim', iban: 'TR02', balance_kurus: 3_820_000, goal_kurus: 5_000_000, credit_limit_kurus: null, frozen: true },
 ];
 
 test('toCustomer API alanlarını uygulama alanlarına eşler', () => {
   assert.deepEqual(toCustomer(me, accounts), {
     customerNo: '123456789',
     fullName: 'Deniz Yılmaz',
+    isAdmin: false,
     accounts: [
-      { id: 1, kind: 'checking', name: 'Vadesiz', iban: 'TR01', balanceKurus: 1_245_075, goalKurus: null, creditLimitKurus: null },
-      { id: 2, kind: 'savings', name: 'Birikim', iban: 'TR02', balanceKurus: 3_820_000, goalKurus: 5_000_000, creditLimitKurus: null },
+      { id: 1, kind: 'checking', name: 'Vadesiz', iban: 'TR01', balanceKurus: 1_245_075, goalKurus: null, creditLimitKurus: null, frozen: false },
+      { id: 2, kind: 'savings', name: 'Birikim', iban: 'TR02', balanceKurus: 3_820_000, goalKurus: 5_000_000, creditLimitKurus: null, frozen: true },
     ],
   });
 });
@@ -52,7 +53,7 @@ test('toMovement ve toTransferResult alanları eşler', () => {
 
 const credit = {
   id: 3, kind: 'credit' as const, name: 'Kredili', iban: 'TR03',
-  balance_kurus: -500_000, goal_kurus: null, credit_limit_kurus: 2_000_000,
+  balance_kurus: -500_000, goal_kurus: null, credit_limit_kurus: 2_000_000, frozen: false,
 };
 
 test('totalBalance kredi borcunu varlık saymaz', () => {

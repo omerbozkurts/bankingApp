@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -43,6 +44,8 @@ class Customer(Base):
     birth_date: Mapped[date | None] = mapped_column(Date)
     failed_login_count: Mapped[int] = mapped_column(default=0, server_default="0")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Granted from the command line (scripts/make_admin.py), never through the API.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -87,6 +90,8 @@ class Account(Base):
     balance_kurus: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     goal_kurus: Mapped[int | None] = mapped_column(BigInteger)
     credit_limit_kurus: Mapped[int | None] = mapped_column(BigInteger)
+    # Set by an admin: no money leaves a frozen account until it is unfrozen.
+    frozen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -97,6 +102,10 @@ class Account(Base):
     def available_kurus(self) -> int:
         """What can be sent from this account: the balance, plus the limit for credit accounts."""
         return self.balance_kurus + (self.credit_limit_kurus or 0)
+
+    @property
+    def frozen(self) -> bool:
+        return self.frozen_at is not None
 
 
 class Transfer(Base):
@@ -136,6 +145,30 @@ class Transaction(Base):
     description: Mapped[str] = mapped_column(String(140))
     # Masked name of the other party for transfers, e.g. "De*** Yı***".
     counterparty: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class AdminAction(Base):
+    """Audit log: one row per change an admin makes. Rows are only ever inserted."""
+
+    __tablename__ = "admin_actions"
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('freeze_account', 'unfreeze_account', 'unlock_customer', "
+            "'grant_admin', 'revoke_admin')",
+            name="action_valid",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Null for changes made on the server itself (scripts/make_admin.py), not by an admin.
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
+    action: Mapped[str] = mapped_column(String(32))
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id"))
+    reason: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )

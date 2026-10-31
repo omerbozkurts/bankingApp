@@ -13,6 +13,7 @@ docker compose up -d --wait   # PostgreSQL 18 → 127.0.0.1:5434 (abbank + abban
 uv sync                       # Python 3.14 ve bağımlılıklar
 uv run alembic upgrade head   # şemayı oluştur
 uv run python -m scripts.seed_demo   # demo: 123456789 / 123456 ve alıcı 987654321 / 654321
+uv run python -m scripts.make_admin 987654321 --reason "Demo yönetici"   # isteğe bağlı
 uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 ```
 
@@ -30,6 +31,12 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `GET` | `/recipients/lookup?iban=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
 | `POST` | `/transfers` | Para transferi; `idempotency_key` aynı isteğin iki kez ödenmesini engeller |
 | `POST` | `/assistant/chat` | Bankacılık asistanı (Claude): `{messages: [{role, content}]}` → `{reply}`; konuşma istemcide tutulur |
+| `GET` | `/admin/customers?q=` | Yönetici: müşteri arama (numara başı veya ad), sayfalı |
+| `GET` | `/admin/customers/{id}` | Yönetici: müşteri, hesapları ve giriş kilidi durumu |
+| `GET` | `/admin/accounts/{id}/transactions` | Yönetici: herhangi bir hesabın hareketleri |
+| `POST` | `/admin/accounts/{id}/freeze` · `/unfreeze` | Yönetici: `{reason}` ile hesabı dondur / çöz |
+| `POST` | `/admin/customers/{id}/unlock` | Yönetici: `{reason}` ile hatalı şifre kilidini aç |
+| `GET` | `/admin/actions` | Yönetici: işlem kaydı (kim, ne, neden, ne zaman), yeniden eskiye |
 | `GET` | `/health` | Uygulama ve veritabanı durumu |
 
 ## Güvenlik
@@ -57,6 +64,13 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 - **Asistan:** salt okunur; Claude yalnızca giriş yapmış müşterinin hesaplarını ve hareketlerini araçlarla
   okur, para hareketi yapamaz (hareket açıklamalarına gömülü talimatlar bakiyeyi değiştiremez). Müşteri
   başına 10 dakikada 20 mesaj. Anahtar: `.env`'de `ANTHROPIC_API_KEY` (veya `ant auth login`).
+- **Yönetici:** yetki API'den verilemez, yalnızca sunucuda `scripts/make_admin.py` ile (`--revoke` ile geri
+  alınır); her istekte veritabanından okunduğu için geri alma anında geçerli. Yönetici müşteri verisini
+  okuyabilir, hesap dondurabilir ve giriş kilidini açabilir; **para hareketi yapamaz, bakiye değiştiremez**.
+  Her değişiklik, yetki verme/kaldırma dahil, gerekçesiyle `admin_actions` tablosuna yazılır (yalnızca
+  ekleme). Yönetici kendi kaydında işlem yapamaz. Dondurulmuş hesaptan para çıkmaz (kilitli satırda kontrol
+  edilir), gelen para kabul edilir. Müşteri satırları hesap satırlarından önce, id sırasıyla kilitlenir;
+  dondurma ile eş zamanlı transfer sıraya girer, deadlock olmaz.
 
 ## Geliştirme
 

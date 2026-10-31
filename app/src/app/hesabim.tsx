@@ -110,6 +110,13 @@ export default function AccountScreen() {
               variant="secondary"
               onPress={() => router.push('/asistan')}
             />
+            {customer.isAdmin ? (
+              <Button
+                title="Yönetici paneli"
+                variant="secondary"
+                onPress={() => router.push('/yonetici')}
+              />
+            ) : null}
           </View>
 
           {refreshError ? (
@@ -146,7 +153,7 @@ function AccountCard({ account }: { account: Account }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${account.name}, ${amount}. Hareketleri gör`}
+      accessibilityLabel={`${account.name}, ${amount}${account.frozen ? ', dondurulmuş' : ''}. Hareketleri gör`}
       onPress={() => router.push({ pathname: '/hesap/[id]', params: { id: String(account.id) } })}
       style={({ pressed }) => [
         styles.card,
@@ -166,6 +173,11 @@ function AccountCard({ account }: { account: Account }) {
       <ThemedText type="small" themeColor="textSecondary">
         {formatIban(account.iban)}
       </ThemedText>
+      {account.frozen ? (
+        <ThemedText type="smallBold" themeColor="danger">
+          Dondurulmuş · para çıkışı yapılamaz
+        </ThemedText>
+      ) : null}
 
       {goal !== null && progress !== null ? (
         <View style={styles.goal}>

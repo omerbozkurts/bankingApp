@@ -11,11 +11,14 @@ export type Account = {
   balanceKurus: number;
   goalKurus: number | null;
   creditLimitKurus: number | null;
+  /** Frozen by the bank: no money can leave it. */
+  frozen: boolean;
 };
 
 export type Customer = {
   customerNo: string;
   fullName: string;
+  isAdmin: boolean;
   accounts: Account[];
 };
 
@@ -43,7 +46,7 @@ export type TransferResult = {
   createdAt: string;
 };
 
-export type ApiCustomer = { customer_no: string; full_name: string };
+export type ApiCustomer = { customer_no: string; full_name: string; is_admin: boolean };
 
 export type ApiAccount = {
   id: number;
@@ -53,6 +56,7 @@ export type ApiAccount = {
   balance_kurus: number;
   goal_kurus: number | null;
   credit_limit_kurus: number | null;
+  frozen: boolean;
 };
 
 export type ApiTransaction = {
@@ -84,11 +88,17 @@ export function toAccount(a: ApiAccount): Account {
     balanceKurus: a.balance_kurus,
     goalKurus: a.goal_kurus,
     creditLimitKurus: a.credit_limit_kurus,
+    frozen: a.frozen,
   };
 }
 
 export function toCustomer(me: ApiCustomer, accounts: ApiAccount[]): Customer {
-  return { customerNo: me.customer_no, fullName: me.full_name, accounts: accounts.map(toAccount) };
+  return {
+    customerNo: me.customer_no,
+    fullName: me.full_name,
+    isAdmin: me.is_admin,
+    accounts: accounts.map(toAccount),
+  };
 }
 
 export function toMovement(t: ApiTransaction): Movement {

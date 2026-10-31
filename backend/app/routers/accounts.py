@@ -84,6 +84,13 @@ async def list_transactions(
     before_id: Annotated[int | None, Query(ge=1, le=2**31 - 1)] = None,
 ) -> TransactionPage:
     await get_owned_account(session, customer.id, account_id)
+    return await transaction_page(session, account_id, limit, before_id)
+
+
+async def transaction_page(
+    session: SessionDep, account_id: int, limit: int, before_id: int | None
+) -> TransactionPage:
+    """Newest first; `before_id` continues from the previous page. Access is checked by callers."""
     query = select(Transaction).where(Transaction.account_id == account_id)
     if before_id is not None:
         query = query.where(Transaction.id < before_id)

@@ -28,7 +28,8 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
 | `GET` | `/me` | Giriş yapmış müşteri (Bearer token veya web çerezi) |
 | `GET` | `/accounts` | Müşterinin hesapları; tutarlar **kuruş** cinsinden tam sayı |
 | `POST` | `/accounts` | Yeni hesap (`checking` / `savings` + isteğe bağlı hedef / `credit`); geçerli TR IBAN üretilir |
-| `GET` | `/accounts/{id}/transactions` | Hareketler, yeniden eskiye; `?limit=20&before_id=` ile sayfalama |
+| `GET` | `/accounts/{id}/transactions` | Hareketler, yeniden eskiye; `?limit=20&before_id=` ile sayfalama, `from_date` / `to_date` ile tarih aralığı |
+| `GET` | `/accounts/{id}/statement?from_date=&to_date=` | Ekstre (CSV; en fazla 366 gün ve 5000 hareket) |
 | `GET` | `/recipients/lookup?iban=` · `?customer_no=` | Alıcının maskeli adı ("Al*** Ka***"), göndermeden önce onay için |
 | `GET` | `/recipients/saved` | Kayıtlı alıcılar (takma ada göre sıralı) |
 | `POST` | `/recipients/saved` | `{nickname, iban \| customer_no}`: alıcıyı sorgu gibi doğrulayıp kaydeder (en fazla 50) |
@@ -73,6 +74,9 @@ uv run fastapi dev app/main.py       # http://localhost:8000 — belgeler: /docs
   ve transfer yanıtında IBAN maskeli döner (`TR12******************0003`); müşteri numarası, arkasındaki
   hesabı açığa çıkarmaz. Limitler ve diğer kurallar IBAN ile gönderimle aynıdır. Numarayla yeni transferler
   alıcı sorgusuyla aynı kotayı kullanır, böylece transfer ucu müşteri numarası taramak için kullanılamaz.
+- **Ekstre:** tarihler Türkiye günüdür (UTC+3). CSV noktalı virgülle ayrılır ve BOM içerir (Türkçe Excel
+  doğru açar). Açıklama ve karşı taraf adı başka müşterilerden gelebildiği için `=`, `+`, `-`, `@` ile
+  başlayan hücrelerin başına `'` eklenir (CSV/formül enjeksiyonu). Yanıt `Cache-Control: no-store`.
 - **Kayıtlı alıcılar:** kaydetme, alıcı sorgusuyla aynı doğrulamayı ve kotayı kullanır (kayıt ucu da tarama
   için kullanılamaz). Müşteri numarasıyla kaydedilen alıcının IBAN'ı saklanmaz; yalnızca kaydedildiği andaki
   maskeli ad tutulur. Her müşteri yalnızca kendi listesini görür ve siler.

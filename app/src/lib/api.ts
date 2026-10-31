@@ -30,6 +30,7 @@ import {
   type ApiAdminCustomer,
 } from './admin';
 import type { ChatMessage } from './assistant';
+import { withBom, type DateRange } from './statement';
 import { clearToken, getToken, setToken, usesBearerToken } from './token-store';
 
 const TIMEOUT_MS = 15_000;
@@ -53,6 +54,8 @@ async function request<T>(
     body?: unknown;
     headers?: Record<string, string>;
     timeoutMs?: number;
+    /** Return a successful body as text instead of parsing JSON (errors are still JSON). */
+    text?: boolean;
   } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
@@ -82,7 +85,12 @@ async function request<T>(
         credentials: 'include',
         signal: controller.signal,
       });
-      if (response.status !== 204) data = await response.json().catch(() => null);
+      if (response.status !== 204) {
+        data =
+          init.text && response.ok
+            ? await response.text()
+            : await response.json().catch(() => null);
+      }
     } catch {
       throw new ApiError(0, NETWORK_ERROR);
     }
@@ -176,19 +184,38 @@ function pageParams(beforeId: number | null, limit: number, extra: Record<string
   return params;
 }
 
-async function movementPage(path: string, beforeId: number | null, limit: number) {
+async function movementPage(
+  path: string,
+  beforeId: number | null,
+  limit: number,
+  range?: DateRange,
+) {
+  const extra: Record<string, string> = range ? { from_date: range.from, to_date: range.to } : {};
   const page = await request<{ items: ApiTransaction[]; next_before_id: number | null }>(
-    `${path}?${pageParams(beforeId, limit)}`,
+    `${path}?${pageParams(beforeId, limit, extra)}`,
   );
   return { items: page.items.map(toMovement), nextBeforeId: page.next_before_id };
 }
 
+/** Newest first; `range` (inclusive Turkish days) narrows the list. */
 export function fetchMovements(
   accountId: number,
   beforeId: number | null = null,
   limit = 20,
+  range?: DateRange,
 ): Promise<MovementPage> {
-  return movementPage(`/accounts/${accountId}/transactions`, beforeId, limit);
+  return movementPage(`/accounts/${accountId}/transactions`, beforeId, limit, range);
+}
+
+/** The statement CSV for a range (the API caps it at 366 days and 5000 movements). */
+export async function fetchStatementCsv(accountId: number, range: DateRange): Promise<string> {
+  const params = new URLSearchParams({ from_date: range.from, to_date: range.to });
+  const csv = await request<string>(`/accounts/${accountId}/statement?${params}`, {
+    text: true,
+    headers: { Accept: 'text/csv' },
+    timeoutMs: 30_000,
+  });
+  return withBom(csv);
 }
 
 function recipientFields(to: RecipientTarget) {

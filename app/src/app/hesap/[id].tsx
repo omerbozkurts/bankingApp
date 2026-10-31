@@ -14,9 +14,10 @@ import { ApiError, fetchMovements } from '@/lib/api';
 import { formatIban } from '@/lib/banking';
 import { debtKurus, type Movement } from '@/lib/models';
 import { formatKurus } from '@/lib/money';
+import { turkishDateFormatter } from '@/lib/statement';
 import { refreshCustomer, signOut, useSession } from '@/lib/session';
 
-const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
+const dateFormatter = turkishDateFormatter({
   day: 'numeric',
   month: 'long',
   hour: '2-digit',
@@ -148,6 +149,11 @@ export default function AccountDetailScreen() {
           onPress={() => router.push({ pathname: '/gonder', params: { hesap: String(account.id) } })}
         />
       )}
+      <Button
+        title="Hesap özeti / CSV"
+        variant="secondary"
+        onPress={() => router.push({ pathname: '/ekstre/[id]', params: { id: String(account.id) } })}
+      />
       <ThemedText type="subtitle">Hesap hareketleri</ThemedText>
       {error ? (
         <Notice tone="error">

@@ -17,6 +17,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type", CSRF_HEADER, SESSION_MODE_HEADER],
+    # Lets the web app read the statement's file name.
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(auth.router)

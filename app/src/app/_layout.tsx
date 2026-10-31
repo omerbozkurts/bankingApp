@@ -62,6 +62,7 @@ export default function RootLayout() {
         <Stack.Screen name="kayit" />
         <Stack.Screen name="hesabim" />
         <Stack.Screen name="hesap/[id]" />
+        <Stack.Screen name="ekstre/[id]" />
         <Stack.Screen name="gonder" />
         <Stack.Screen name="aktar" />
         <Stack.Screen name="asistan" />
